@@ -1,0 +1,9 @@
+﻿-- logger module started --
+main error: no suitable interface module
+main error: interface "globalhotkeys,none" initialization failed
+dbus error: Failed to connect to the D-Bus session daemon: Unable to autolaunch a dbus-daemon without a $DISPLAY for X11
+main error: no suitable interface module
+main error: interface "dbus,none" initialization failed
+lua: Lua HTTP interface
+main: stopping playback
+-- logger module stopped --

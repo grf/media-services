@@ -1,0 +1,53 @@
+
+
+Sinatra server for media
+
+    Video/
+
+    Music/			- list albums
+    Music/Albums		- list songs
+    Music/Albums/Music		- play song
+
+
+
+VLC
+    See https://wiki.videolan.org/VLC_HTTP_requests/,  and files in satya:/usr/share/vlc/lua/http/requests - the readme there
+    was copied to lua-httpd-README.txt in this directory
+
+    Examples:
+
+    clvc --quiet  --play-and-exit --gain 0.25 file:///data/Sounds/ringtones/normalized/planet_claire.ogg
+
+Start up server:
+
+ cvlc --file-logging --logfile cvlc.txt --daemon --intf http --http-host 0.0.0.0 --http-port 9090 --http-password foo
+
+    try adding --no-video (and --quiet?) to the above
+    ulimately use  --syslog and --syslog-xxxx settings
+
+  on Mac OS X:
+
+  /Applications/VLC.app/Contents//MacOS/VLC  --intf http --http-host 0.0.0.0 --http-port 9090 --http-password foo
+
+
+
+Set volume (100 seems to be 100% - 100% should work if urlencoded?)
+
+   curl -v --user :foo 'http://satyagraha.sacred.net:9090/requests/status.xml?command=volume&val=100'
+
+Add directory full of music (what happens if a cover in there?)
+
+  curl -v --user :foo 'http://satyagraha.sacred.net:9090/requests/status.json?command=in_play&input=file:///data/Music/Gétatchèw%20Mèkurya/Negus%20Of%20Ethiopian%20Sax%20(Ethiopiques%20Vol.14)'
+
+get playlists (very aggressive about adding to playlist):
+
+  curl -v --user :foo 'http://satyagraha.sacred.net:9090/requests/playlist.xml'
+  curl -v --user :foo 'http://satyagraha.sacred.net:9090/requests/playlist.json'
+
+Next on playlist:
+
+  curl -v --user :foo 'http://satyagraha.sacred.net:9090/requests/status.json?command=pl_next'
+
+Browse a directory:
+
+  curl -v --user :foo 'http://satyagraha.sacred.net:9090/requests/browse.json?dir=/data/Music/'

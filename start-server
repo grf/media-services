@@ -1,0 +1,3 @@
+#!/bin/sh
+
+exec cvlc --file-logging --logfile ~/cvlc.txt --daemon --intf http --http-host 0.0.0.0 --http-port 9090 --http-password foo

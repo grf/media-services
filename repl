@@ -1,0 +1,428 @@
+#!/usr/bin/env ruby
+
+# TODO:
+#
+# "http://satyagraha.sacred.net:9090/requests/status.xml?command=volume&val=100"
+#
+# Start satya server like:
+#
+#   cvlc --file-logging --logfile ~/cvlc.txt --daemon --intf http --http-host 0.0.0.0 --http-port 9090 --http-password foo
+
+
+
+require 'json'
+require 'rest-client'
+require 'uri'
+
+@http = 'http://satyagraha.sacred.net:9090/'
+@pass = 'foo'
+@user = ''
+
+MUSIC_ROOT   = 'file:///data/Music/'
+STATUS_PAUSE = 0.25
+STDOUT.sync  = true
+DEBUG = true
+
+# Top level REPL loop.
+
+def main
+  usage
+  while true
+    write("cvlc> ")
+    text = execute(get())
+    next if text.nil? or text.empty?
+    write(text, "\n")
+  end
+rescue => e
+  write e, "\n\n"
+  retry
+end
+
+# write(text, text...) ship out supplied text strings - do nothing if
+# called without data.
+
+def write *text
+  STDOUT.write text.join() unless text.empty?
+end
+
+# get() - reads and cleans up input, exiting if EOF has been reached
+# (^D is entered, normally).  Input is returned otherwise.
+
+def get
+  input = STDIN.gets
+  if input.nil?
+    write "Goodbye, and thanks for all the fish!\n"
+    exit
+  end
+  return input.strip
+end
+
+# execute(input) - expect input to be "command" or "command data...";
+# branch based on command.
+
+def execute input
+  return case input.strip
+         when '';                          ''
+         when /^([0-9]+)/;                 do_play_id($1)
+         when /^ad*\s+(.*)/;               do_add($1)
+         when /^ar/;                       do_art()
+         when /^b/;                        do_bonjour()
+         when /^c/;                        do_clear_playlist()
+         when /^e[a-z]*\s+(.*)/;           do_enqueue($1)
+         when /^l/;                        do_list()
+         when /^n/;                        do_next()
+         when /^p/;                        do_prev()
+         when /^rawlist/;                  do_raw_list()
+         when /^rawcommand\s+(.*)/;        do_raw_command($1)
+         when /^s/;                        do_status()
+         when /^v[^\s]*\s+([0-9+\-\+]+)/;  do_volume($1)
+         else
+           "Huh. This program doesn't do '#{input}'."
+         end
+end
+
+## Helpers section
+
+def usage
+  write "Usage:
+    <number>           play entry <number> from the playlist
+    ad(d) <path>       add <path> to the playlist, begin playing
+    ar(t)              get artwork from currently playing
+    b(onjour)          turn on bonjour service discovery
+    c(lear)            clear the playlist
+    e(nqueue) <path>   add <path> to the end of the playlist
+    l(list)            print the current playlist
+    n(ext)             play next entry on the playlist
+    p(revious)         play the previous entry
+    rawlist            print raw JSON playlist
+    rawcommand <cmd>   use the low-level command cmd
+    s(tatus)           pretty print status of cvlc server
+    v(olume) <num>     set volume from 0..150
+
+"
+end
+
+
+# pretty_status(status) - status is a json-derived hash, print it out somewhat pretty
+
+def pretty_status status
+  strings = []
+  status.keys.sort.each { |k| strings.push sprintf("%15s: %s", k, status[k].inspect) }
+  return strings.join("\n")
+end
+
+
+
+# get_status() - returns data about the current cvlc status - can be as complex as:
+#
+# {
+#   "loop": false,
+#   "audiofilters": {
+#     "filter_0": ""
+#   },
+#   "state": "playing",
+#   "equalizer": [
+#
+#   ],
+#   "rate": 1,
+#   "random": false,
+#   "stats": {
+#     "displayedpictures": 0,
+#     "sentbytes": 0,
+#     "readbytes": 3603606,
+#     "demuxcorrupted": 0,
+#     "playedabuffers": 431,
+#     "decodedvideo": 0,
+#     "sendbitrate": 0,
+#     "averagedemuxbitrate": 0,
+#     "lostpictures": 0,
+#     "demuxreadbytes": 3451489,
+#     "readpackets": 343,
+#     "lostabuffers": 0,
+#     "demuxbitrate": 0.085678078234196,
+#     "averageinputbitrate": 0,
+#     "demuxdiscontinuity": 0,
+#     "sentpackets": 0,
+#     "inputbitrate": 0.080183073878288,
+#     "demuxreadpackets": 0,
+#     "decodedaudio": 431
+#   },
+#   "version": "2.1.4 Rincewind",
+#   "time": 40,
+#   "currentplid": 76,
+#   "videoeffects": {
+#     "saturation": 1,
+#     "contrast": 1,
+#     "gamma": 1,
+#     "hue": 0,
+#     "brightness": 1
+#   },
+#   "position": 0.10163500159979,
+#   "volume": 90,
+#   "length": 394,
+#   "audiodelay": 0,
+#   "apiversion": 3,
+#   "subtitledelay": 0,
+#   "repeat": false,
+#   "information": {
+#     "chapters": [
+#
+#     ],
+#     "category": {
+#       "meta": {
+#         "ISRC": "USU2C1000002",
+#         "track_number": "2",
+#         "title": "Escape Artist",
+#         "description": "Visit http://music.zoekeating.com",
+#         "artwork_url": "file:///home/fischer/.cache/vlc/art/artistalbum/Zoe%20Keating/Into%20The%20Trees/art.jpg",
+#         "date": "2010",
+#         "album": "Into The Trees",
+#         "COMMENT": "Visit http://music.zoekeating.com",
+#         "artist": "Zoe Keating",
+#         "filename": "Escape Artist",
+#         "ALBUMARTIST": "Zoe Keating"
+#       },
+#       "Stream 0": {
+#         "Channels": "Stereo",
+#         "Type": "Audio",
+#         "Codec": "FLAC (Free Lossless Audio Codec) (flac)",
+#         "Bits_per_sample": "16",
+#         "Sample_rate": "44100 Hz"
+#       }
+#     },
+#     "titles": [
+#
+#     ],
+#     "title": 0,
+#     "chapter": 0
+#   },
+#   "fullscreen": 0
+# }
+
+def get_status
+  return JSON.parse(do_command('requests/status.json'))
+end
+
+# get_playlist()  interrogates the cvlc web service and returns a list of music on the
+# current playlist;  elements of the list look as so:
+#
+# {
+#   "uri": "file:///data/Music/Zo%C3%AB%20Keating/Into%20the%20Trees/01.%20Forest.flac",
+#   "id": "75",
+#   "type": "leaf",
+#   "duration": 45,
+#   "current": "current",
+#   "ro": "rw",
+#   "name": "Forest"
+# },
+#
+# The empty playlist appears as so (if music were on the playlist, they'd be under node-id 2, in the children array):
+#
+# {
+#   "id": "1",
+#   "type": "node",
+#   "name": "Undefined",
+#   "ro": "rw"
+#   "children": [
+#                  {
+#                    "children": [       ],
+#                    "id": "2",
+#                    "type": "node",
+#                    "name": "Playlist",
+#                    "ro": "ro"
+#                  },
+#
+#                  {
+#                    "children": [       ],
+#                    "id": "3",
+#                    "type": "node",
+#                    "name": "Media Library",
+#                    "ro": "ro"
+#                  }
+#              ],
+# }
+#
+
+
+def get_playlist
+  playlist = JSON.parse(do_command('requests/playlist.json'))
+  inner    = playlist['children'].first
+  output   = []
+
+  if inner['name'] =~ /playlist/i and inner['children'].class == Array
+     inner['children'].each do |elt|
+       next unless elt['type'] == 'leaf'
+       next if elt['uri']  == 'vlc://nop'
+       output.push elt
+     end
+  else
+    raise "Unexpected playlist output: \n" + JSON.pretty_generate(playlist)
+  end
+  return output
+end
+
+
+# id_now_playing(status) examines the status data structure returned
+# by the cvlc service, and returns the id of the song in the playlist
+# currently playing. If nothing is playing, it returns nil.
+
+def id_now_playing status
+  return (status['state'] == 'playing' ? status['currentplid'].to_i.to_s : nil)
+end
+
+# currently_playing() returns a pretty string indicating the song
+# playing, or, if nothing is playing, the string 'idle'
+
+def currently_playing
+  sleep STATUS_PAUSE
+  status = get_status()
+  get_playlist().each do |elt|
+    if elt['id'].to_s == id_now_playing(status)
+      return sprintf("   %03d -  %s", elt['id'], URI.decode(elt['uri'].gsub(MUSIC_ROOT, '').gsub(/^\/+/, '')))
+    end
+  end
+  return 'idle'
+end
+
+
+# Command actually ships the command out to the cvlc server, used by top-level instructions
+
+def do_command command
+  command  = [ @http, command ].join
+  resource =  RestClient::Resource.new(command, @user, @pass)
+  response = resource.get
+
+  raise "Bad response code #{response.code} for command '#{command}'" unless response.code < 300
+
+  if DEBUG
+    write command + "\n"
+    # write response.code.to_s + ' ' + response.headers[:content_type].to_s + "\n"
+    # write response.body +  "\n"
+    # write [ response.methods - Object.methods ].map { |m| m.inspect }.sort.join(', ') + "\n\n"
+    # write " #{response.code.inspect} #{response.headers.inspect}\n\n"
+  end
+
+  return response
+rescue => e
+  write "do_command: #{e}\n"
+  raise "do_command: Error communicating wth cvlc media service."
+end
+
+
+
+## Top level commands
+
+# do_list() returns the playlist pretty-printed, highlighting the
+# currently playing entry (if one is being played) with an
+# asterisk. Empty return text is possible.
+
+def do_list
+  status = get_status()
+  output = []
+  get_playlist().each do |elt|
+    marker = (elt['id'].to_s == id_now_playing(status) ? '*' : ' ')
+    output.push sprintf("%s   %03d -  %s", marker, elt['id'], URI.decode(elt['uri'].gsub(MUSIC_ROOT, '').gsub(/^\/+/, '')))
+  end
+  return output.join("\n")
+end
+
+# do_add(name) - add the
+# name should not include full URI path (TODO: we'll have to make it
+# do so at some point when we make this a class)
+
+def do_add pathname = nil
+  raise "add requires a pathname" if pathname.nil?
+  string = URI.encode(pathname.sub(%r{/+$},''))
+  status = JSON.parse(do_command("requests/status.json?command=in_play&input=#{MUSIC_ROOT}/#{string}&option=novideo"))
+  return currently_playing()
+end
+
+# do_status() - returns a compact list of the returned json.
+
+def do_status
+  return pretty_status(get_status)
+end
+
+# do_next() - do next entry on playlist, wraps around
+
+def do_next
+  status = JSON.parse(do_command('requests/status.json?command=pl_next'))
+  return currently_playing()
+end
+
+# do_prev() - do previous entry on playlist, wraps around
+
+def do_prev
+  status = JSON.parse(do_command('requests/status.json?command=pl_previous'))
+  return currently_playing()
+end
+
+
+def do_play_id id
+  status = JSON.parse(do_command("requests/status.json?command=pl_play&id=#{id.to_i}"))
+  return currently_playing()
+end
+
+
+def do_raw_list
+  return JSON.pretty_generate(JSON.parse(do_command('requests/playlist.json')))
+end
+
+
+def do_clear_playlist
+  status = JSON.parse(do_command('requests/status.json?command=pl_empty'))
+  return
+end
+
+# TODO: take optional playlist index argument:
+
+def do_art
+  art = do_command('art');
+  return art.inspect
+end
+
+
+def do_enqueue pathname = nil
+  raise "enqueue requires a pathname" if pathname.nil?
+  string = URI.encode(pathname.sub(%r{/+$},''))
+  status = JSON.parse(do_command("requests/status.json?command=in_enqueue&input=#{MUSIC_ROOT}/#{string}"))
+  return currently_playing()
+end
+
+
+def do_bonjour
+  status = JSON.parse(do_command('requests/status.json?command=pl_sd&val=bonjour'))
+  return pretty_status(status)
+end
+
+
+def do_raw_command command = nil
+  raise "rawcomand requires a command string" if command.nil?
+  status = JSON.parse(do_command(command))
+  return pretty_status(status)
+end
+
+
+# TODO: need to put some limits on this:
+#
+# if num,  then must be <= 250
+# if +num, then current volume must be  <= 250 - num
+# don't care about -num
+#
+# 100 == 0 for some reason...
+
+
+def do_volume num = nil
+  raise "volume requires an integer value between 1 and 300..." if num.nil?
+  val = num.to_i
+  raise "volume requires an integer value between 1 and 300..." if  val > 300
+
+  JSON.parse(do_command("requests/status.json?command=volume&val=#{num}"))
+  sleep STATUS_PAUSE
+  return pretty_status(get_status())
+end
+
+
+
+
+main()
