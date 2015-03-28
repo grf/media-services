@@ -21,7 +21,7 @@ require 'uri'
 MUSIC_ROOT   = 'file:///data/Music/'
 STATUS_PAUSE = 0.25
 STDOUT.sync  = true
-DEBUG = true
+DEBUG = false
 
 # Top level REPL loop.
 
