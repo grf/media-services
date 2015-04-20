@@ -69,15 +69,20 @@ def execute input
          when /^b/;                        do_bonjour()
          when /^c/;                        do_clear_playlist()
          when /^e[a-z]*\s+(.*)/;           do_enqueue($1)
-         when /^l/;                        do_list()
+         when /^li/;                       do_list()
+         when /^lo/;                       do_toggle_loop()
          when /^n/;                        do_next()
          when /^p/;                        do_prev()
+         when /^ran/;                      do_toggle_random()
          when /^rawlist/;                  do_raw_list()
          when /^rawcommand\s+(.*)/;        do_raw_command($1)
-         when /^s/;                        do_status()
+         when /^re/;                       do_toggle_repeat()
+         when /^st/;                       do_status()
          when /^v[^\s]*\s+([0-9+\-\+]+)/;  do_volume($1)
+         when /^\?/;                       do_help()
          else
            "Huh. This program doesn't do '#{input}'."
+           usage()
          end
 end
 
@@ -91,13 +96,17 @@ def usage
     b(onjour)          turn on bonjour service discovery
     c(lear)            clear the playlist
     e(nqueue) <path>   add <path> to the end of the playlist
-    l(list)            print the current playlist
+    li(st)             print the current playlist
+    lo(oo)             toggle looping
     n(ext)             play next entry on the playlist
     p(revious)         play the previous entry
+    ran(dom)           toggle random play
     rawlist            print raw JSON playlist
     rawcommand <cmd>   use the low-level command cmd
-    s(tatus)           pretty print status of cvlc server
+    re(peat)           toggle repeat
+    st(atus)           pretty print status of cvlc server
     v(olume) <num>     set volume from 0..150
+    ?                  this help
 
 "
 end
@@ -332,6 +341,7 @@ end
 
 def do_add pathname = nil
   raise "add requires a pathname" if pathname.nil?
+  #  raise "No such file or directory '#{pathname}'" unless File.exists? "#{MUSIC_ROOT}/#{pathname}"
   string = URI.encode(pathname.sub(%r{/+$},''))
   status = JSON.parse(do_command("requests/status.json?command=in_play&input=#{MUSIC_ROOT}/#{string}&option=novideo"))
   return currently_playing()
@@ -373,6 +383,28 @@ def do_clear_playlist
   status = JSON.parse(do_command('requests/status.json?command=pl_empty'))
   return
 end
+
+def do_toggle_random
+  status = JSON.parse(do_command('requests/status.json?command=pl_random'))
+  return
+end
+
+def do_toggle_loop
+  status = JSON.parse(do_command('requests/status.json?command=pl_loop'))
+  return
+end
+
+def do_toggle_repeat
+  status = JSON.parse(do_command('requests/status.json?command=pl_repeat'))
+  return
+end
+
+
+def do_help
+  usage()
+  return
+end
+
 
 # TODO: take optional playlist index argument:
 

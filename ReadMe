@@ -1,6 +1,28 @@
+This is morphing a lot.  First, we want a music/video server running -
+so one of the big subtasks is for satya to run CVLC as a daemon,  and connect to it.
+
+So far, discovery services for other devices:
+
+nexus-7  -  does SSDP, publishes DIAL as second screen device.
+chromecast - used to do DIAL,  now mDNs/bonjour for discovery
+roku - does SSDP for discovery, HTTP API directly of course.
+vsx - mDNS/bonjour
+macbook air - mDNS/bonjour for itunes, whats-my-name (http?)
+others? UPnP?
+
+See roku-ssdp for service discovery, using the SSDP ruby gem (need to study this)
+
+Also very good - some caching daemons for UPnp ans SSDP
+-https://github.com/miniupnp/miniupnp and http://miniupnp.free.fr/
+though only C interfaces explained.  Could use a ruby client to read
+the daemon's sockets.
+
+e.g., nexus-7
+   SSDP M-SEARCH from 192.168.88.19:41472 ST:urn:dial-multiscreen-org:service:dial:1
+   SSDP M-SEARCH from 192.168.88.19:41472 ST:urn:mdx-netflix-com:service:target:1
 
 
-Sinatra server for media
+** Sinatra server for media
 
     Video/
 
@@ -10,7 +32,7 @@ Sinatra server for media
 
 
 
-VLC
+** VLC
     See https://wiki.videolan.org/VLC_HTTP_requests/,  and files in satya:/usr/share/vlc/lua/http/requests - the readme there
     was copied to lua-httpd-README.txt in this directory
 
