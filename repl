@@ -13,6 +13,9 @@
 require 'json'
 require 'rest-client'
 require 'uri'
+require 'timeout'
+
+
 
 @http = 'http://satyagraha.sacred.net:9090/'
 @pass = 'foo'
@@ -22,6 +25,7 @@ MUSIC_ROOT   = 'file:///data/Music/'
 STATUS_PAUSE = 0.25
 STDOUT.sync  = true
 DEBUG = false
+QUICKLY_TIMEOUT = 2.5
 
 # Top level REPL loop.
 
@@ -111,6 +115,14 @@ def usage
 "
 end
 
+
+def quickly time = QUICKLY_TIMEOUT
+  Timeout.timeout(time) do
+    yield
+  end
+rescue Timeout::Error => e
+  raise "Timed out after #{time} seconds"
+end
 
 # pretty_status(status) - status is a json-derived hash, print it out somewhat pretty
 
@@ -299,16 +311,19 @@ end
 def do_command command
   command  = [ @http, command ].join
   resource =  RestClient::Resource.new(command, @user, @pass)
-  response = resource.get
 
-  raise "Bad response code #{response.code} for command '#{command}'" unless response.code < 300
+  quickly do
+    response = resource.get
 
-  if DEBUG
-    write command + "\n"
-    # write response.code.to_s + ' ' + response.headers[:content_type].to_s + "\n"
-    # write response.body +  "\n"
-    # write [ response.methods - Object.methods ].map { |m| m.inspect }.sort.join(', ') + "\n\n"
-    # write " #{response.code.inspect} #{response.headers.inspect}\n\n"
+    raise "Bad response code #{response.code} for command '#{command}'" unless response.code < 300
+
+    if DEBUG
+      write command + "\n"
+      # write response.code.to_s + ' ' + response.headers[:content_type].to_s + "\n"
+      # write response.body +  "\n"
+      # write [ response.methods - Object.methods ].map { |m| m.inspect }.sort.join(', ') + "\n\n"
+      # write " #{response.code.inspect} #{response.headers.inspect}\n\n"
+    end
   end
 
   return response
