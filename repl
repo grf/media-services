@@ -312,10 +312,12 @@ def do_command command
   command  = [ @http, command ].join
   resource =  RestClient::Resource.new(command, @user, @pass)
 
-  quickly do
-    response = resource.get
+  response = quickly do
+    puts "resource:", resource.inspect, '' if DEBUG
+    res = resource.get
+    puts "response", res.inspect, '' if DEBUG
 
-    raise "Bad response code #{response.code} for command '#{command}'" unless response.code < 300
+    raise "Bad response code #{response.code} for command '#{command}'" unless res.code < 300
 
     if DEBUG
       write command + "\n"
@@ -324,11 +326,13 @@ def do_command command
       # write [ response.methods - Object.methods ].map { |m| m.inspect }.sort.join(', ') + "\n\n"
       # write " #{response.code.inspect} #{response.headers.inspect}\n\n"
     end
+    res
   end
 
   return response
 rescue => e
   write "do_command: #{e}\n"
+  STDERR.puts e.backtrace
   raise "do_command: Error communicating wth cvlc media service."
 end
 
