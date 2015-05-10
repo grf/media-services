@@ -15,6 +15,10 @@ require 'rest-client'
 require 'uri'
 require 'timeout'
 
+$LOAD_PATH.unshift File.dirname(__FILE__)
+
+require 'trie'
+
 
 
 @http = 'http://satyagraha.sacred.net:9090/'
@@ -30,16 +34,45 @@ QUICKLY_TIMEOUT = 2.5
 # Top level REPL loop.
 
 def main
-  usage
+  commands = setup_commands()
+  usage(commands)
   while true
     write("cvlc> ")
-    text = execute(get())
+    text = execute(commands, get())
     next if text.nil? or text.empty?
     write(text, "\n")
   end
 rescue => e
-  write e, "\n\n"
+  # write e, "\n\n"
+  write e, e.backtrace, "\n\n"
   retry
+end
+
+# TODO:  add
+# when /^rawlist/;                  do_raw_list()
+# when /^rawcommand\s+(.*)/;        do_raw_command($1)
+
+def setup_commands
+  commands = Trie.new
+
+  commands['delete']      =  { :name => 'delete',   :command => lambda { |id|     do_delete_id(id) },  :argument => Fixnum, :help => "remove item <num> from the playlist" }
+  commands['play']        =  { :name => 'play',     :command => lambda { |id|     do_play_id(id) },    :argument => Fixnum, :help => "play item <num> from the playlist" }
+  commands['volume']      =  { :name => 'volume',   :command => lambda { |level|  do_volume(level) },  :argument => Fixnum, :help => "set volume to <num>,  0..300" }
+
+  commands['add']         =  { :name => 'add',      :command => lambda { |dir|    do_add(dir) },      :argument => String, :help => "add directory or filename <string> to the playlist, begin playing" }
+  commands['enqueue']     =  { :name => 'enqueue',  :command => lambda { |dir|    do_enqueue(dir) },  :argument => String, :help => "add directory or filename <string> to the end of the playlist" }
+
+  commands['?']           =  { :name => '?',        :command => lambda { do_help() },            :argument => nil, :help => "this help" }
+  commands['clear']       =  { :name => 'clear',    :command => lambda { do_clear_playlist() },  :argument => nil, :help => "clear the playlist" }
+  commands['list']        =  { :name => 'list',     :command => lambda { do_list() },            :argument => nil, :help => "print the current playlist" }
+  commands['loop']        =  { :name => 'loop',     :command => lambda { do_toggle_loop() },     :argument => nil, :help => "toggle looping" }
+  commands['next']        =  { :name => 'next',     :command => lambda { do_next() },            :argument => nil, :help => "play next entry on the playlist" }
+  commands['previous']    =  { :name => 'previous', :command => lambda { do_previous() },        :argument => nil, :help => "play the previous entry" }
+  commands['random']      =  { :name => 'random',   :command => lambda { do_toggle_random() },   :argument => nil, :help => "toggle random play" }
+  commands['repeat']      =  { :name => 'repeat',   :command => lambda { do_toggle_repeat() },   :argument => nil, :help => "toggle repeat" }
+  commands['status']      =  { :name => 'status',   :command => lambda { do_status() },          :argument => nil, :help => "pretty print status of cvlc server" }
+
+  return commands
 end
 
 # write(text, text...) ship out supplied text strings - do nothing if
@@ -64,55 +97,51 @@ end
 # execute(input) - expect input to be "command" or "command data...";
 # branch based on command.
 
-def execute input
-  return case input.strip
-         when '';                          ''
-         when /^([0-9]+)/;                 do_play_id($1)
-         when /^ad*\s+(.*)/;               do_add($1)
-         when /^ar/;                       do_art()
-         when /^b/;                        do_bonjour()
-         when /^c/;                        do_clear_playlist()
-         when /^e[a-z]*\s+(.*)/;           do_enqueue($1)
-         when /^li/;                       do_list()
-         when /^lo/;                       do_toggle_loop()
-         when /^n/;                        do_next()
-         when /^p/;                        do_prev()
-         when /^ran/;                      do_toggle_random()
-         when /^rawlist/;                  do_raw_list()
-         when /^rawcommand\s+(.*)/;        do_raw_command($1)
-         when /^re/;                       do_toggle_repeat()
-         when /^st/;                       do_status()
-         when /^v[^\s]*\s+([0-9+\-\+]+)/;  do_volume($1)
-         when /^\?/;                       do_help()
-         else
-           "Huh. This program doesn't do '#{input}'."
-           usage()
-         end
+def execute commands, input
+
+  command, argument = input.strip.split(/\s+/, 2)
+
+  # special cases:
+
+  return if not  command
+  return do_play_id(command)  if command =~ /^\d+$/ and argument.nil?
+
+  completions = commands.completions(command)
+
+  case completions.count
+  when 0
+    puts "This program doesn't know how to '#{command}'."
+    usage(commands)
+
+  when 1
+    record   = completions[0][1]
+    thunk    = record[:command]
+    argtype  = record[:argument]
+
+    #### TODO: check argument_types...  safe_arg(argument, class) ....
+
+    return thunk.call()              if argtype == NilClass
+    return thunk.call(argument.to_i) if argtype == Fixnum
+    return thunk.call(argument.to_s) if argtype == String
+
+    raise "Don't know what to do... for arguments of class #{argtype}"
+
+  else
+    puts "'#{input}' is ambiguous (could be '#{completions.map{ |rec| rec[0] }.join("', '")}')."
+    return nil
+  end
 end
 
-## Helpers section
 
-def usage
-  write "Usage:
-    <number>           play entry <number> from the playlist
-    ad(d) <path>       add <path> to the playlist, begin playing
-    ar(t)              get artwork from currently playing
-    b(onjour)          turn on bonjour service discovery
-    c(lear)            clear the playlist
-    e(nqueue) <path>   add <path> to the end of the playlist
-    li(st)             print the current playlist
-    lo(oo)             toggle looping
-    n(ext)             play next entry on the playlist
-    p(revious)         play the previous entry
-    ran(dom)           toggle random play
-    rawlist            print raw JSON playlist
-    rawcommand <cmd>   use the low-level command cmd
-    re(peat)           toggle repeat
-    st(atus)           pretty print status of cvlc server
-    v(olume) <num>     set volume from 0..150
-    ?                  this help
+### TODO: get argument list out in front!
 
-"
+def usage commands
+  records = commands.values
+  max = records.map { |rec| rec[:name].length }.max
+  puts "Usage:"
+  records.each { |rec| puts sprintf("%#{max + 1}s:  %s", rec[:name], rec[:help]) }
+  puts ''
+  return nil
 end
 
 
@@ -379,9 +408,9 @@ def do_next
   return currently_playing()
 end
 
-# do_prev() - do previous entry on playlist, wraps around
+# do_previous() - do previous entry on playlist, wraps around
 
-def do_prev
+def do_previous
   status = JSON.parse(do_command('requests/status.json?command=pl_previous'))
   return currently_playing()
 end
@@ -389,6 +418,12 @@ end
 
 def do_play_id id
   status = JSON.parse(do_command("requests/status.json?command=pl_play&id=#{id.to_i}"))
+  return currently_playing()
+end
+
+
+def do_delete_id id
+  status = JSON.parse(do_command("requests/status.json?command=pl_delete&id=#{id.to_i}"))
   return currently_playing()
 end
 
@@ -419,8 +454,8 @@ def do_toggle_repeat
 end
 
 
-def do_help
-  usage()
+def do_help commands
+  usage(commands)
   return
 end
 
@@ -465,14 +500,12 @@ end
 
 def do_volume num = nil
   raise "volume requires an integer value between 1 and 300..." if num.nil?
-  val = num.to_i
-  raise "volume requires an integer value between 1 and 300..." if  val > 300
+  raise "volume requires an integer value between 1 and 300..." if num.to_i > 300
 
   JSON.parse(do_command("requests/status.json?command=volume&val=#{num}"))
   sleep STATUS_PAUSE
   return pretty_status(get_status())
 end
-
 
 
 
