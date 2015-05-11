@@ -8,8 +8,9 @@
 #
 #   cvlc --file-logging --logfile ~/cvlc.txt --daemon --intf http --http-host 0.0.0.0 --http-port 9090 --http-password foo
 #
-# This client code provides a read-eval-print loop that lets you communicate with the cvlc server, so that you can
-# maintain a playlist, adjust volumes, next/prev/random controls, etc.
+# This client code provides a read-eval-print loop (REPL) that lets
+# you communicate with the cvlc server, so that you can maintain a
+# playlist, adjust volumes, next/prev/random controls, etc.
 
 
 require 'json'
@@ -21,26 +22,27 @@ $LOAD_PATH.unshift File.dirname(__FILE__)
 
 require 'trie'
 
-@http = 'http://satyagraha.sacred.net:9090/'
+@http = 'http://satyagraha.sacred.net:9090/'   # adjust for the address of your server.
 @pass = 'foo'
 @user = ''
 
 MUSIC_ROOT      = 'file:///data/Music/'   # Where my music is stored; we'll include this when sending a pathname to the cvlc server, which can look for locally.
 STATUS_PAUSE    = 0.25                    # Some commands need a little time to set up, or to complete.  This value should be less than 1 sec, ideally less than 300 msec.
-STDOUT.sync     = true                    #
-QUICKLY_TIMEOUT = 2.5
+QUICKLY_TIMEOUT = 2.50                    #
+STDOUT.sync     = true                    # REPL needs immediate flush
 
 # Top level REPL (Read-Eval-Print Loop).
 
 def main
-  commands = setup_commands()
+  available_commands = setup_commands()
   while true
     write("cvlc> ")
-    write(execute(commands, get()), "\n")
+    response = execute(available_commands, get())
+    write(response, "\n") unless response.empty? or response.nil?
   end
 rescue => e
-  write e, "\n\n"
-  usage(commands)
+  write(e, "\n\n")
+  usage(available_commands)
   retry
 end
 
@@ -52,22 +54,22 @@ end
 def setup_commands
   commands = Trie.new
 
-  commands['delete']      =  { :name => 'delete',   :command => lambda { |id|     do_delete_id(id) },  :argument => Fixnum, :help => "remove item <num> from the playlist" }
-  commands['play']        =  { :name => 'play',     :command => lambda { |id|     do_play_id(id) },    :argument => Fixnum, :help => "play item <num> from the playlist" }
+  commands['delete']      =  { :name => 'delete',   :command => lambda { |id|  do_delete_id(id) },     :argument => Fixnum, :help => "remove item <num> from the playlist" }
+  commands['play']        =  { :name => 'play',     :command => lambda { |id|  do_play_id(id) },       :argument => Fixnum, :help => "play item <num> from the playlist" }
   commands['volume']      =  { :name => 'volume',   :command => lambda { |level|  do_volume(level) },  :argument => Fixnum, :help => "set volume to <num>,  0..300" }
 
-  commands['add']         =  { :name => 'add',      :command => lambda { |dir|    do_add(dir) },      :argument => String, :help => "add directory or filename <string> to the playlist, begin playing" }
-  commands['enqueue']     =  { :name => 'enqueue',  :command => lambda { |dir|    do_enqueue(dir) },  :argument => String, :help => "add directory or filename <string> to the end of the playlist" }
+  commands['add']         =  { :name => 'add',      :command => lambda { |dir|  do_add(dir) },         :argument => String, :help => "add directory or filename <string> to the playlist, begin playing" }
+  commands['enqueue']     =  { :name => 'enqueue',  :command => lambda { |dir|  do_enqueue(dir) },     :argument => String, :help => "add directory or filename <string> to the end of the playlist" }
 
-  commands['?']           =  { :name => '?',        :command => lambda { do_help(commands) },    :argument => nil, :help => "this help" }
-  commands['clear']       =  { :name => 'clear',    :command => lambda { do_clear_playlist() },  :argument => nil, :help => "clear the playlist" }
-  commands['list']        =  { :name => 'list',     :command => lambda { do_list() },            :argument => nil, :help => "print the current playlist" }
-  commands['loop']        =  { :name => 'loop',     :command => lambda { do_toggle_loop() },     :argument => nil, :help => "toggle looping" }
-  commands['next']        =  { :name => 'next',     :command => lambda { do_next() },            :argument => nil, :help => "play next entry on the playlist" }
-  commands['previous']    =  { :name => 'previous', :command => lambda { do_previous() },        :argument => nil, :help => "play the previous entry" }
-  commands['random']      =  { :name => 'random',   :command => lambda { do_toggle_random() },   :argument => nil, :help => "toggle random play" }
-  commands['repeat']      =  { :name => 'repeat',   :command => lambda { do_toggle_repeat() },   :argument => nil, :help => "toggle repeat" }
-  commands['status']      =  { :name => 'status',   :command => lambda { do_status() },          :argument => nil, :help => "pretty print status of cvlc server" }
+  commands['?']           =  { :name => '?',        :command => lambda { do_help(commands) },          :argument => nil,    :help => "this help" }
+  commands['clear']       =  { :name => 'clear',    :command => lambda { do_clear_playlist() },        :argument => nil,    :help => "clear the playlist" }
+  commands['list']        =  { :name => 'list',     :command => lambda { do_list() },                  :argument => nil,    :help => "print the current playlist" }
+  commands['loop']        =  { :name => 'loop',     :command => lambda { do_toggle_loop() },           :argument => nil,    :help => "toggle looping" }
+  commands['next']        =  { :name => 'next',     :command => lambda { do_next() },                  :argument => nil,    :help => "play next entry on the playlist" }
+  commands['previous']    =  { :name => 'previous', :command => lambda { do_previous() },              :argument => nil,    :help => "play the previous entry" }
+  commands['random']      =  { :name => 'random',   :command => lambda { do_toggle_random() },         :argument => nil,    :help => "toggle random play" }
+  commands['repeat']      =  { :name => 'repeat',   :command => lambda { do_toggle_repeat() },         :argument => nil,    :help => "toggle repeat" }
+  commands['status']      =  { :name => 'status',   :command => lambda { do_status() },                :argument => nil,    :help => "pretty print status of cvlc server" }
 
   return commands
 end
@@ -94,7 +96,8 @@ end
 
 # The 'E' in the REPL: execute("command [arg]") - expect input to be
 # "command" or "command data..."; Run the command's associated method
-# after cleaning up input, and return whatever the command returns.
+# after cleaning up input and possibly separating out the argument.
+# Return whatever the particular command executed returns.
 
 def execute commands, input
 
@@ -164,7 +167,6 @@ def usage commands
     usage = rec[:name] + " <string>" if rec[:argument] == String
     usage_notes.push( { :signature => usage, :help => rec[:help] } )
   end
-
 
   max = usage_notes.map { |rec| rec[:signature].length }.max
   puts "Usage:"
@@ -436,23 +438,19 @@ def do_previous
   return currently_playing()
 end
 
-
 def do_play_id id
   do_command("requests/status.json?command=pl_play&id=#{id.to_i}")
   return currently_playing()
 end
-
 
 def do_delete_id id
   do_command("requests/status.json?command=pl_delete&id=#{id.to_i}")
   return currently_playing()
 end
 
-
 def do_raw_list
   return JSON.pretty_generate(JSON.parse(do_command('requests/playlist.json')))
 end
-
 
 def do_clear_playlist
   do_command('requests/status.json?command=pl_empty')
@@ -461,7 +459,7 @@ end
 
 def do_toggle_random
   do_command('requests/status.json?command=pl_random')
-  return
+  return currently_playing()
 end
 
 def do_toggle_loop
@@ -471,16 +469,13 @@ end
 
 def do_toggle_repeat
   do_command('requests/status.json?command=pl_repeat')
-  return
+  return currently_playing()
 end
 
 def do_help commands
   usage(commands)
   return
 end
-
-
-# TODO: take optional playlist index argument:
 
 def do_art
   art = do_command('art');
@@ -504,7 +499,7 @@ def do_raw_command
 end
 
 
-# TODO: need to put some limits on this:
+# TODO: need to document this better....
 #
 # if num,  then must be <= 250
 # if +num, then current volume must be  <= 250 - num
