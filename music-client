@@ -1,13 +1,15 @@
 #!/usr/bin/env ruby
-
-# TODO:
 #
-# "http://satyagraha.sacred.net:9090/requests/status.xml?command=volume&val=100"
+# Talk to a cvlc server via HTTP commands such as:
 #
-# Start satya server like:
+#      http://satyagraha.sacred.net:9090/requests/status.xml?command=volume&val=100
+#
+# On starts cvlc server as so:
 #
 #   cvlc --file-logging --logfile ~/cvlc.txt --daemon --intf http --http-host 0.0.0.0 --http-port 9090 --http-password foo
-
+#
+# This client code provides a read-eval-print loop that lets you communicate with the cvlc server, so that you can
+# maintain a playlist, adjust volumes, next/prev/random controls, etc.
 
 
 require 'json'
@@ -19,38 +21,33 @@ $LOAD_PATH.unshift File.dirname(__FILE__)
 
 require 'trie'
 
-
-
 @http = 'http://satyagraha.sacred.net:9090/'
 @pass = 'foo'
 @user = ''
 
-MUSIC_ROOT   = 'file:///data/Music/'
-STATUS_PAUSE = 0.25
-STDOUT.sync  = true
-DEBUG = false
+MUSIC_ROOT      = 'file:///data/Music/'   # Where my music is stored; we'll include this when sending a pathname to the cvlc server, which can look for locally.
+STATUS_PAUSE    = 0.25                    # Some commands need a little time to set up, or to complete.  This value should be less than 1 sec, ideally less than 300 msec.
+STDOUT.sync     = true                    #
 QUICKLY_TIMEOUT = 2.5
 
-# Top level REPL loop.
+# Top level REPL (Read-Eval-Print Loop).
 
 def main
   commands = setup_commands()
-  usage(commands)
   while true
     write("cvlc> ")
-    text = execute(commands, get())
-    next if text.nil? or text.empty?
-    write(text, "\n")
+    write(execute(commands, get()), "\n")
   end
 rescue => e
   write e, "\n\n"
-  # write e, e.backtrace, "\n\n"
+  usage(commands)
   retry
 end
 
-# TODO:  add
-# when /^rawlist/;                  do_raw_list()
-# when /^rawcommand\s+(.*)/;        do_raw_command($1)
+
+# The setup_commands() creates a TRIE (a specialized kind of Key/Value
+# hash) that provides all the information needed for executing the
+# functions the user enters in the REPL loop.
 
 def setup_commands
   commands = Trie.new
@@ -75,15 +72,16 @@ def setup_commands
   return commands
 end
 
-# write(text, text...) ship out supplied text strings - do nothing if
-# called without data.
+# The 'P' in the REPL: write(text, text...) ship out supplied text
+# strings.
 
 def write *text
   STDOUT.write text.join() unless text.empty?
 end
 
-# get() - reads and cleans up input, exiting if EOF has been reached
-# (^D is entered, normally).  Input is returned otherwise.
+# The 'R' in the REPL: get() - reads and cleans up input, exiting if
+# EOF has been reached (^D is entered, normally).  Input is returned
+# otherwise.
 
 def get
   input = STDIN.gets
@@ -94,8 +92,9 @@ def get
   return input.strip
 end
 
-# execute(input) - expect input to be "command" or "command data...";
-# branch based on command.
+# The 'E' in the REPL: execute("command [arg]") - expect input to be
+# "command" or "command data..."; Run the command's associated method
+# after cleaning up input, and return whatever the command returns.
 
 def execute commands, input
 
@@ -138,7 +137,8 @@ def execute commands, input
   end
 end
 
-def argument_errors(name, argval, argtype)
+
+def argument_errors name, argval, argtype
 
   return case
          when (not argval.nil? and argtype.nil? )
@@ -174,8 +174,8 @@ def usage commands
 end
 
 
-
-
+# Use quickly() as wrapper for time-sensitive operations, esp. for
+# communicating over the network with the cvlc server.
 
 def quickly time = QUICKLY_TIMEOUT
   Timeout.timeout(time) do
@@ -374,27 +374,16 @@ def do_command command
   resource =  RestClient::Resource.new(command, @user, @pass)
 
   response = quickly do
-    puts "resource:", resource.inspect, '' if DEBUG
     res = resource.get
-    puts "response", res.inspect, '' if DEBUG
-
     raise "Bad response code #{response.code} for command '#{command}'" unless res.code < 300
-
-    if DEBUG
-      write command + "\n"
-      # write response.code.to_s + ' ' + response.headers[:content_type].to_s + "\n"
-      # write response.body +  "\n"
-      # write [ response.methods - Object.methods ].map { |m| m.inspect }.sort.join(', ') + "\n\n"
-      # write " #{response.code.inspect} #{response.headers.inspect}\n\n"
-    end
     res
   end
 
   return response
 rescue => e
   write "do_command: #{e}\n"
-  puts e.backtrace
-  raise "do_command: Error tyrying to communicate wth the cvlc media service (is it running?)."
+  puts  "do_command: Error tyrying to communicate wth the cvlc media service (is it running?)."
+  return nil
 end
 
 
@@ -423,7 +412,7 @@ def do_add pathname = nil
   raise "add requires a pathname" if pathname.nil?
   #  raise "No such file or directory '#{pathname}'" unless File.exists? "#{MUSIC_ROOT}/#{pathname}"
   string = URI.encode(pathname.sub(%r{/+$},''))
-  status = JSON.parse(do_command("requests/status.json?command=in_play&input=#{MUSIC_ROOT}/#{string}&option=novideo"))
+  do_command("requests/status.json?command=in_play&input=#{MUSIC_ROOT}/#{string}&option=novideo")
   return currently_playing()
 end
 
@@ -436,26 +425,26 @@ end
 # do_next() - do next entry on playlist, wraps around
 
 def do_next
-  status = JSON.parse(do_command('requests/status.json?command=pl_next'))
+  do_command('requests/status.json?command=pl_next')
   return currently_playing()
 end
 
 # do_previous() - do previous entry on playlist, wraps around
 
 def do_previous
-  status = JSON.parse(do_command('requests/status.json?command=pl_previous'))
+  do_command('requests/status.json?command=pl_previous')
   return currently_playing()
 end
 
 
 def do_play_id id
-  status = JSON.parse(do_command("requests/status.json?command=pl_play&id=#{id.to_i}"))
+  do_command("requests/status.json?command=pl_play&id=#{id.to_i}")
   return currently_playing()
 end
 
 
 def do_delete_id id
-  status = JSON.parse(do_command("requests/status.json?command=pl_delete&id=#{id.to_i}"))
+  do_command("requests/status.json?command=pl_delete&id=#{id.to_i}")
   return currently_playing()
 end
 
@@ -466,25 +455,24 @@ end
 
 
 def do_clear_playlist
-  status = JSON.parse(do_command('requests/status.json?command=pl_empty'))
+  do_command('requests/status.json?command=pl_empty')
   return
 end
 
 def do_toggle_random
-  status = JSON.parse(do_command('requests/status.json?command=pl_random'))
+  do_command('requests/status.json?command=pl_random')
   return
 end
 
 def do_toggle_loop
-  status = JSON.parse(do_command('requests/status.json?command=pl_loop'))
+  do_command('requests/status.json?command=pl_loop')
   return
 end
 
 def do_toggle_repeat
-  status = JSON.parse(do_command('requests/status.json?command=pl_repeat'))
+  do_command('requests/status.json?command=pl_repeat')
   return
 end
-
 
 def do_help commands
   usage(commands)
@@ -499,25 +487,20 @@ def do_art
   return art.inspect
 end
 
-
 def do_enqueue pathname = nil
   raise "enqueue requires a pathname" if pathname.nil?
   string = URI.encode(pathname.sub(%r{/+$},''))
-  status = JSON.parse(do_command("requests/status.json?command=in_enqueue&input=#{MUSIC_ROOT}/#{string}"))
+  do_command("requests/status.json?command=in_enqueue&input=#{MUSIC_ROOT}/#{string}")
   return currently_playing()
 end
 
-
 def do_bonjour
-  status = JSON.parse(do_command('requests/status.json?command=pl_sd&val=bonjour'))
-  return pretty_status(status)
+  return pretty_status(JSON.parse(do_command('requests/status.json?command=pl_sd&val=bonjour')))
 end
 
-
-def do_raw_command command = nil
-  raise "rawcomand requires a command string" if command.nil?
-  status = JSON.parse(do_command(command))
-  return pretty_status(status)
+def do_raw_command
+  return unless command
+  return pretty_status(JSON.parse(do_command(command)))
 end
 
 
@@ -533,8 +516,9 @@ end
 def do_volume num = nil
   raise "volume requires an integer value between 1 and 300..." if num.nil?
   raise "volume requires an integer value between 1 and 300..." if num.to_i > 300
+  raise "volume requires an integer value between 1 and 300..." if num.to_i < 1
 
-  JSON.parse(do_command("requests/status.json?command=volume&val=#{num}"))
+  do_command("requests/status.json?command=volume&val=#{num}")
   sleep STATUS_PAUSE
   return pretty_status(get_status())
 end
