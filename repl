@@ -43,8 +43,8 @@ def main
     write(text, "\n")
   end
 rescue => e
-  # write e, "\n\n"
-  write e, e.backtrace, "\n\n"
+  write e, "\n\n"
+  # write e, e.backtrace, "\n\n"
   retry
 end
 
@@ -62,7 +62,7 @@ def setup_commands
   commands['add']         =  { :name => 'add',      :command => lambda { |dir|    do_add(dir) },      :argument => String, :help => "add directory or filename <string> to the playlist, begin playing" }
   commands['enqueue']     =  { :name => 'enqueue',  :command => lambda { |dir|    do_enqueue(dir) },  :argument => String, :help => "add directory or filename <string> to the end of the playlist" }
 
-  commands['?']           =  { :name => '?',        :command => lambda { do_help() },            :argument => nil, :help => "this help" }
+  commands['?']           =  { :name => '?',        :command => lambda { do_help(commands) },    :argument => nil, :help => "this help" }
   commands['clear']       =  { :name => 'clear',    :command => lambda { do_clear_playlist() },  :argument => nil, :help => "clear the playlist" }
   commands['list']        =  { :name => 'list',     :command => lambda { do_list() },            :argument => nil, :help => "print the current playlist" }
   commands['loop']        =  { :name => 'loop',     :command => lambda { do_toggle_loop() },     :argument => nil, :help => "toggle looping" }
@@ -110,39 +110,71 @@ def execute commands, input
 
   case completions.count
   when 0
-    puts "This program doesn't know how to '#{command}'."
     usage(commands)
+    puts "This program doesn't know how to '#{command}'."
+    return
 
   when 1
     record   = completions[0][1]
     thunk    = record[:command]
     argtype  = record[:argument]
 
-    #### TODO: check argument_types...  safe_arg(argument, class) ....
+    errors = argument_errors(command, argument, argtype)
 
-    return thunk.call()              if argtype == NilClass
+    if errors
+      usage(commands)
+      puts errors
+      return
+    end
+
+    return thunk.call()              if argtype == nil
     return thunk.call(argument.to_i) if argtype == Fixnum
     return thunk.call(argument.to_s) if argtype == String
 
-    raise "Don't know what to do... for arguments of class #{argtype}"
-
+    raise "Don't know what to do... for arguments of class '#{argtype}'"
   else
     puts "'#{input}' is ambiguous (could be '#{completions.map{ |rec| rec[0] }.join("', '")}')."
     return nil
   end
 end
 
+def argument_errors(name, argval, argtype)
 
-### TODO: get argument list out in front!
+  return case
+         when (not argval.nil? and argtype.nil? )
+           "The '#{name}' command takes no arguments."
+         when ((argval !~ /^\d+$/ and argtype == Fixnum) or (argval.nil? and argtype == Fixnum))
+           "The '#{name}' command takes a number as an argument."
+         when (argval.nil? and argtype == String)
+           "The '#{name}' command takes a string as an argument."
+         else
+           nil
+         end
+end
+
+
 
 def usage commands
-  records = commands.values
-  max = records.map { |rec| rec[:name].length }.max
+
+  usage_notes = []
+
+  commands.values.each do |rec|
+    usage = rec[:name]               if rec[:argument] == nil
+    usage = rec[:name] + " <num>"    if rec[:argument] == Fixnum
+    usage = rec[:name] + " <string>" if rec[:argument] == String
+    usage_notes.push( { :signature => usage, :help => rec[:help] } )
+  end
+
+
+  max = usage_notes.map { |rec| rec[:signature].length }.max
   puts "Usage:"
-  records.each { |rec| puts sprintf("%#{max + 1}s:  %s", rec[:name], rec[:help]) }
+  usage_notes.each { |rec| puts sprintf("%#{max + 1}s:  %s", rec[:signature], rec[:help]) }
   puts ''
   return nil
 end
+
+
+
 
 
 def quickly time = QUICKLY_TIMEOUT
@@ -361,8 +393,8 @@ def do_command command
   return response
 rescue => e
   write "do_command: #{e}\n"
-  STDERR.puts e.backtrace
-  raise "do_command: Error communicating wth cvlc media service."
+  puts e.backtrace
+  raise "do_command: Error tyrying to communicate wth the cvlc media service (is it running?)."
 end
 
 
