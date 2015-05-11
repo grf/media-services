@@ -360,7 +360,7 @@ def currently_playing
   status = get_status()
   get_playlist().each do |elt|
     if elt['id'].to_s == id_now_playing(status)
-      return sprintf("   %03d -  %s", elt['id'], URI.decode(elt['uri'].gsub(MUSIC_ROOT, '').gsub(/^\/+/, '')))
+      return sprintf("*   %03d -  %s", elt['id'], URI.decode(elt['uri'].gsub(MUSIC_ROOT, '').gsub(/^\/+/, '')))
     end
   end
   return 'idle'
