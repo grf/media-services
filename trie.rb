@@ -6,9 +6,10 @@
 
 # Randy Fischer (rf@ufl.edu) reimplemented this wheel on 2010-06-13.  Pleasant exercise.
 #
-# Build a trie - my goal was to remove the largest common prefix from
-# a list of strings. See the twigs method to get that.  This also does
-# the usual trie tricks: stores key/value pairs, orders the keys, etc.
+# Build a trie - my initial goal was to remove the largest common
+# prefix from a list of strings.  This also does the usual trie
+# tricks: stores key/value pairs, orders the keys, searchs for all
+# substrings given a match pattern, etc.
 #
 # Example program:
 #
@@ -194,13 +195,18 @@ class Trie
 
   public
 
-  # returns [ [ key, val ], [ key, val ] ... ]  for all possible completions of string:
+  # completion(string) returns [ [ key, val ], [ key, val ] ... ] from
+  # the trie object, where string is substring (including an exact
+  # match) of all the returned keys. While key is a string, val can be
+  # pretty much anything.  The keys are returned sorted.
 
   def completions string
     completions = []
     completions_helper '', string, root, completions
     return completions
   end
+
+  private
 
   def completions_helper matched, pending, node, completions
     # two cases:
@@ -217,13 +223,12 @@ class Trie
     else
 
     # 2) pending has more letters to consume, so we need to look-ahead
-    # at children for a match, recursion will record values
+    # at children for a match, recursion will record values.
 
-      next_letter = pending[0..0]
-      matched     = matched + next_letter
-      pending     = pending[1..-1]
+      nletter, pending = pending[0..0], pending[1..-1]
+      matched = matched + nletter
 
-      node.children.each { |nd| completions_helper(matched, pending, nd, completions) if nd.letter == next_letter }
+      node.children.each { |nd| completions_helper(matched, pending, nd, completions) if nd.letter == nletter }
     end
   end
 
