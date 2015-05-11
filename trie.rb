@@ -194,33 +194,36 @@ class Trie
 
   public
 
-  # returns [ [ key, val ], [ key, val ] ... ]  for all possible completions of match, including exact.
+  # returns [ [ key, val ], [ key, val ] ... ]  for all possible completions of string:
 
-  def completions match
+  def completions string
     completions = []
-    completions_helper '', match, root, completions
+    completions_helper '', string, root, completions
     return completions
   end
 
-  def completions_helper match, tail, node, completions
+  def completions_helper matched, pending, node, completions
     # two cases:
 
-    # 1) tail is empty, so we've matched as much as we can; record if node has a value,  then check the children to see if we're a prefix for other nodes.
+    # 1) pending is empty, so we've matched the entire string; record
+    # the key/value if the current node has a value, then check the
+    # children to see if we're a prefix for other nodes.
 
-    if tail.empty? or tail.nil?
+    if pending.empty? or pending.nil?
 
-      completions.push [ match, node.value.unwrap ]  if node.value
-      node.children.each { |nd| completions_helper(match + nd.letter, tail, nd, completions) }
+      completions.push [ matched, node.value.unwrap ]  if node.value
+      node.children.each { |nd| completions_helper(matched + nd.letter, pending, nd, completions) }
 
     else
 
-    # 2) tail has more letters to consume, so we need to look-ahead at children for exact matches, recursion will record
+    # 2) pending has more letters to consume, so we need to look-ahead
+    # at children for a match, recursion will record values
 
-      next_letter = tail[0..0]
-      match       = match + next_letter
-      tail        = tail[1..-1]
+      next_letter = pending[0..0]
+      matched     = matched + next_letter
+      pending     = pending[1..-1]
 
-      node.children.each { |nd| completions_helper(match, tail, nd, completions) if nd.letter == next_letter }
+      node.children.each { |nd| completions_helper(matched, pending, nd, completions) if nd.letter == next_letter }
     end
   end
 
