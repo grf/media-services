@@ -51,6 +51,7 @@ end
 # hash) that provides all the information needed for executing the
 # functions the user enters in the REPL loop.
 
+# TODO: dry up that second :name invocation.
 def setup_commands
   commands = Trie.new
 

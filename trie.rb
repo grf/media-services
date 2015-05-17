@@ -8,10 +8,10 @@
 
 # Randy Fischer (rf@ufl.edu) reimplemented this wheel on 2010-06-13.  Pleasant exercise.
 #
-# Build a trie - my initial goal was to find the largest common
-# prefix from a list of strings.  This also does the usual trie
-# tricks: stores key/value pairs, orders the keys, searchs for all
-# substrings given a match pattern, etc.
+# Build a trie (a kind of sorted hash) - my initial goal was to find
+# the largest common prefix from a list of strings.  This also does
+# the usual trie tricks: stores key/value pairs, orders the keys,
+# searchs for all substrings given a match pattern, etc.
 
 class Trie
 
@@ -109,7 +109,7 @@ class Trie
     end
   end
 
-
+  # TODO: this behavoir seems unexpected... just return matching keys?
 
   # completion(string) returns [ [ key, val ], [ key, val ] ... ] from
   # the trie object, where string is substring (including an exact
