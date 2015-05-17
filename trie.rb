@@ -1,37 +1,17 @@
 # -*- coding: utf-8 -*-
 #
-# TODO: add delete method
 # TODO: node should really be equivalent to a trie, so a subtree can use trie methods...
-#
+# TODO: rework lookup using completion()-like routine?
+# TODO: add each method (other enumerables?)
+# TODO: add delete method
+
 
 # Randy Fischer (rf@ufl.edu) reimplemented this wheel on 2010-06-13.  Pleasant exercise.
 #
-# Build a trie - my initial goal was to remove the largest common
+# Build a trie - my initial goal was to find the largest common
 # prefix from a list of strings.  This also does the usual trie
 # tricks: stores key/value pairs, orders the keys, searchs for all
 # substrings given a match pattern, etc.
-#
-# Example program:
-#
-#  trie = Trie.new
-#
-#  trie['silos.darchive.fcla.edu:/daitssfs/001'] = :a
-#  trie['silos.darchive.fcla.edu:/daitssfs/002'] = :b
-#  trie['silos.darchive.fcla.edu:/daitssfs/002'] = :c
-#  trie['silos.darchive.fcla.edu:/daitssfs/004'] = :d
-#  trie['silos.darchive.fcla.edu:/daitssfs/010'] = :e
-#  trie['silos.darchive.fcla.edu:/daitssfs/015'] = :f
-#  trie['silos.darchive.fcla.edu:/daitssfs/027'] = :g
-#
-#  trie['silos.darchive.fcla.edu:/daitssfs/002']     => :c
-#
-#
-#  trie.keys   =>  [ "silos.darchive.fcla.edu:/daitssfs/001", "silos.darchive.fcla.edu:/daitssfs/002", .. ]
-#  trie.values =>  [ :a, :c, :d, :e, :f, :g ]
-#
-#  trie.prefix => 'silos.darchive.fcla.edu:/daitssfs/0'
-#
-#  trie.twigs  => [ '01', '02', '04', '10', '15', '27' ]
 
 class Trie
 
@@ -120,15 +100,6 @@ class Trie
     collection.map { |box| box.unwrap }
   end
 
-  # There's a broken by design bug in here: if the largest common
-  # prefix is itself a key, we'll get an empty string. You'll need to
-  # check for that case. TODO: fix that.
-
-  def twigs
-    len = prefix.length
-    keys.map { |k| k[len..-1]}
-  end
-
   # Huh.  Must be for debugging or sumthin...
 
   def dump node = root, indent = ''
@@ -138,7 +109,44 @@ class Trie
     end
   end
 
+
+
+  # completion(string) returns [ [ key, val ], [ key, val ] ... ] from
+  # the trie object, where string is substring (including an exact
+  # match) of all the returned keys. While key is a string, val can be
+  # pretty much anything.  The keys are returned sorted.
+
+  def completions string
+    completions = []
+    completions_helper '', string, root, completions
+    return completions
+  end
+
   private
+
+  def completions_helper matched, pending, node, completions
+    # two cases:
+
+    # 1) pending is empty, so we've matched the entire string; record
+    # the key/value if the current node has a value, then check the
+    # children to see if we're a prefix for other nodes.
+
+    if pending.empty? or pending.nil?
+
+      completions.push [ matched, node.value.unwrap ]  if node.value
+      node.children.each { |nd| completions_helper(matched + nd.letter, pending, nd, completions) }
+
+    else
+
+    # 2) pending has more letters to consume, so we need to look-ahead
+    # at children for a match, recursion will record values.
+
+      nletter, pending = pending[0..0], pending[1..-1]
+      matched = matched + nletter
+
+      node.children.each { |nd| completions_helper(matched, pending, nd, completions) if nd.letter == nletter }
+    end
+  end
 
   # Store a value for a key. Used for []= above.
 
@@ -191,45 +199,6 @@ class Trie
     end
 
     return nil
-  end
-
-  public
-
-  # completion(string) returns [ [ key, val ], [ key, val ] ... ] from
-  # the trie object, where string is substring (including an exact
-  # match) of all the returned keys. While key is a string, val can be
-  # pretty much anything.  The keys are returned sorted.
-
-  def completions string
-    completions = []
-    completions_helper '', string, root, completions
-    return completions
-  end
-
-  private
-
-  def completions_helper matched, pending, node, completions
-    # two cases:
-
-    # 1) pending is empty, so we've matched the entire string; record
-    # the key/value if the current node has a value, then check the
-    # children to see if we're a prefix for other nodes.
-
-    if pending.empty? or pending.nil?
-
-      completions.push [ matched, node.value.unwrap ]  if node.value
-      node.children.each { |nd| completions_helper(matched + nd.letter, pending, nd, completions) }
-
-    else
-
-    # 2) pending has more letters to consume, so we need to look-ahead
-    # at children for a match, recursion will record values.
-
-      nletter, pending = pending[0..0], pending[1..-1]
-      matched = matched + nletter
-
-      node.children.each { |nd| completions_helper(matched, pending, nd, completions) if nd.letter == nletter }
-    end
   end
 
 end
