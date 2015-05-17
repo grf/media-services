@@ -36,9 +36,9 @@ STDOUT.sync     = true                    # REPL needs immediate flush
 def main
   available_commands = setup_commands()
   while true
-    write("cvlc> ")
+    write("muse> ")
     response = execute(available_commands, get())
-    write(response, "\n") unless response.empty? or response.nil?
+    write(response, "\n") unless response.nil? or response.empty?
   end
 rescue => e
   write(e, "\n\n")
