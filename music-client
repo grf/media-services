@@ -66,10 +66,14 @@ def setup_commands
   commands['list']        =  { :name => 'list',     :command => lambda { do_list() },                  :argument => nil,    :help => "print the current playlist" }
   commands['loop']        =  { :name => 'loop',     :command => lambda { do_toggle_loop() },           :argument => nil,    :help => "toggle looping" }
   commands['next']        =  { :name => 'next',     :command => lambda { do_next() },                  :argument => nil,    :help => "play next entry on the playlist" }
+  commands['pause']       =  { :name => 'pause',    :command => lambda { do_force_pause() },           :argument => nil,    :help => "pause playing" }
   commands['previous']    =  { :name => 'previous', :command => lambda { do_previous() },              :argument => nil,    :help => "play the previous entry" }
   commands['random']      =  { :name => 'random',   :command => lambda { do_toggle_random() },         :argument => nil,    :help => "toggle random play" }
   commands['repeat']      =  { :name => 'repeat',   :command => lambda { do_toggle_repeat() },         :argument => nil,    :help => "toggle repeat" }
+  commands['resume']      =  { :name => 'resume',   :command => lambda { do_force_resume() },          :argument => nil,    :help => "resume playing" }
   commands['status']      =  { :name => 'status',   :command => lambda { do_status() },                :argument => nil,    :help => "pretty print status of cvlc server" }
+  commands['stop']        =  { :name => 'stop',     :command => lambda { do_stop() },                  :argument => nil,    :help => "stop playing" }
+
 
   return commands
 end
@@ -93,6 +97,7 @@ def get
   end
   return input.strip
 end
+
 
 # The 'E' in the REPL: execute("command [arg]") - expect input to be
 # "command" or "command data..."; Run the command's associated method
@@ -496,6 +501,21 @@ end
 def do_raw_command
   return unless command
   return pretty_status(JSON.parse(do_command(command)))
+end
+
+def do_stop
+  do_command('requests/status.json?command=pl_stop')
+  return
+end
+
+def do_force_pause
+  do_command('requests/status.json?command=pl_forcepause')
+  return
+end
+
+def do_force_resume
+  do_command('requests/status.json?command=pl_forceresume')
+  return
 end
 
 
