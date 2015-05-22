@@ -495,9 +495,13 @@ def do_enqueue pathname = nil
   return currently_playing()
 end
 
+# Doesn't seem to work
+
 def do_bonjour
   return pretty_status(JSON.parse(do_command('requests/status.json?command=pl_sd&val=bonjour')))
 end
+
+# TODO: add this to commands....
 
 def do_raw_command
   return unless command
