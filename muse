@@ -12,7 +12,6 @@
 # you communicate with the cvlc server, so that you can maintain a
 # playlist, adjust volumes, next/prev/random controls, etc.
 
-
 require 'json'
 require 'rest-client'
 require 'uri'
@@ -418,8 +417,8 @@ end
 
 def do_add pathname = nil
   raise "add requires a pathname" if pathname.nil?
-  #  raise "No such file or directory '#{pathname}'" unless File.exists? "#{MUSIC_ROOT}/#{pathname}"
-  string = URI.encode(pathname.sub(%r{/+$},''))
+  raise "No such file or directory '#{pathname}'" unless File.exists? "#{MUSIC_ROOT}/#{pathname}"
+  string = URI.encode(pathname.sub(%r{/+$},'')).gsub('&', '%26')
   do_command("requests/status.json?command=in_play&input=#{MUSIC_ROOT}/#{string}&option=novideo")
   return currently_playing()
 end
