@@ -2,18 +2,15 @@
 #
 # Talk to a cvlc server via HTTP commands such as:
 #
-#      http://satyagraha.sacred.net:9090/requests/status.xml?command=volume&val=100
+#   http://satyagraha.sacred.net:9090/requests/status.xml?command=volume&val=100
 #
-# On starts cvlc server as so:
+# One starts cvlc server as so:
 #
 #   cvlc --file-logging --logfile ~/cvlc.txt --daemon --intf http --http-host 0.0.0.0 --http-port 9090 --http-password foo
 #
 # This client code provides a read-eval-print loop (REPL) that lets
 # you communicate with the cvlc server, so that you can maintain a
 # playlist, adjust volumes, next/prev/random controls, etc.
-
-
-# TODO: switch all error heandling to raising errors (maybe backtrace if not our specialized error?)
 
 
 require 'json'
@@ -28,35 +25,40 @@ class MuseError < StandardError; end
 
 require 'command-executor'
 
-@http = 'http://satyagraha.sacred.net:9090/'   # adjust for the address of your server.
+@http = 'http://satyagraha.sacred.net:9090/'   # adjust for the address of server.
 @pass = 'foo'
 @user = ''
 
 MUSIC_ROOT      = '/data/Music'           # Where my music is stored; we'll include this when sending a pathname to the cvlc server, which can look for locally.
 STATUS_PAUSE    = 0.25                    # Some commands need a little time to set up, or to complete.  This value should be less than 1 sec, ideally less than 300 msec.
-QUICKLY_TIMEOUT = 2.50                    #
+QUICKLY_TIMEOUT = 2.50                    # How long to wait for a response from the CVLC server
 STDOUT.sync     = true                    # REPL needs immediate flush
 
 # Top level REPL (Read-Eval-Print Loop).
 
 def main supported_commands
-  unexceptionals = [ MuseError,  CommandExecutorError ]
   while true
     write("muse> ")
     command = get()
     goodbye if command.nil?
     response = execute(supported_commands, command)
-    write(response, "\n") unless response.nil? or response.empty?
+    writeln(response.chomp) unless response.nil? or response.empty?
   end
 rescue => exception
-  write supported_commands.usage, "\n", exception.message, "\n"
-  write exception.class, "\n", exception.backtrace.join("\n"), "\n" unless unexceptionals.include? exception.class
+  error_message(supported_commands, exception)
   retry
 end
 
 def goodbye
-  write "Goodbye, and thanks for all the fish!\n"
+  writeln "Goodbye, and thanks for all the fish!"
   exit
+end
+
+def error_message supported_commands, exception
+  writeln supported_commands.usage, "\n", exception.message
+  unless [ CommandExecutorError, MuseError ].include? exception.class
+    writeln exception.class, "\n", exception.backtrace.join("\n")
+  end
 end
 
 # The 'P' in the REPL: write(text, text...) ship out supplied text
@@ -64,6 +66,10 @@ end
 
 def write *text
   STDOUT.write text.flatten.join() unless text.empty?
+end
+
+def writeln *text
+  write text, "\n"  unless text.empty?
 end
 
 # The 'R' in the REPL: get() - reads and cleans up input, exiting if
@@ -77,22 +83,19 @@ def get
 end
 
 # The 'E' in the REPL is mostly done by the CommandExecutor object
-# method supported_commands.execute("command [arg]").
+# method CommandExecutor#execute(String).
 #
-# Here we're just fielding a few special conditions specific to this
+# Here we're just fielding any special conditions specific to this
 # program.
-#
+
+def execute supported, command
+   return supported.execute("play #{command}") if command =~ /^\d+$/
+   return supported.execute(command)
+end
+
 # The setup_commands() creates the CommandEexcutor object, providing
 # all the information needed for executing the functions the user
 # enters in the REPL loop, as well as providing help text, etc.
-
-def execute supported_commands, command
-
-   return supported_commands.execute("play #{command}") if command =~ /^\d+$/
-   return supported_commands.execute(command)
-end
-
-
 
 def setup_commands
   commands = CommandExecutor.new
@@ -354,9 +357,9 @@ def do_list
   output = []
   get_playlist().each do |elt|
     marker = (elt['id'].to_s == id_now_playing(status) ? '*' : ' ')
-    output.push sprintf("%s   %03d -  %s", marker, elt['id'], cleanup_pathname(URI.decode(elt['uri'])))
+    output.push sprintf("%s   %03d -  %s\n", marker, elt['id'], cleanup_pathname(URI.decode(elt['uri'])))
   end
-  return output.join("\n")
+  return output.join
 end
 
 # do_add(name) - add the
@@ -432,6 +435,8 @@ def do_seek amount
   end
   return
 end
+
+# the scoping for using this is pretty atrocious, see setup_commands
 
 def do_help commands
   return commands.usage
