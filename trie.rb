@@ -133,7 +133,7 @@ class Trie
 
     if pending.empty? or pending.nil?
 
-      completions.push [ matched, node.value.unwrap ]  if node.value
+      completions.push matched if node.value
       node.children.each { |nd| completions_helper(matched + nd.letter, pending, nd, completions) }
 
     else
