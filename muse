@@ -12,6 +12,10 @@
 # you communicate with the cvlc server, so that you can maintain a
 # playlist, adjust volumes, next/prev/random controls, etc.
 
+
+# TODO: switch all error heandling to raising errors (maybe backtrace if not our specialized error?)
+
+
 require 'json'
 require 'rest-client'
 require 'uri'
@@ -25,23 +29,22 @@ require 'trie'
 @pass = 'foo'
 @user = ''
 
-MUSIC_ROOT      = 'file:///data/Music/'   # Where my music is stored; we'll include this when sending a pathname to the cvlc server, which can look for locally.
+MUSIC_ROOT      = '/data/Music'           # Where my music is stored; we'll include this when sending a pathname to the cvlc server, which can look for locally.
 STATUS_PAUSE    = 0.25                    # Some commands need a little time to set up, or to complete.  This value should be less than 1 sec, ideally less than 300 msec.
 QUICKLY_TIMEOUT = 2.50                    #
 STDOUT.sync     = true                    # REPL needs immediate flush
 
 # Top level REPL (Read-Eval-Print Loop).
 
-def main
-  available_commands = setup_commands()
+def main available_commands
   while true
     write("muse> ")
     response = execute(available_commands, get())
     write(response, "\n") unless response.nil? or response.empty?
   end
 rescue => e
-  write(e, "\n\n")
   usage(available_commands)
+  write(e, "\n")
   retry
 end
 
@@ -50,7 +53,8 @@ end
 # hash) that provides all the information needed for executing the
 # functions the user enters in the REPL loop.
 
-# TODO: dry up that second :name invocation.
+# TODO: dry up that second :name invocation -
+
 def setup_commands
   commands = Trie.new
 
@@ -58,8 +62,9 @@ def setup_commands
   commands['play']        =  { :name => 'play',     :command => lambda { |id|  do_play_id(id) },       :argument => Fixnum, :help => "play item <num> from the playlist" }
   commands['volume']      =  { :name => 'volume',   :command => lambda { |level|  do_volume(level) },  :argument => Fixnum, :help => "set volume to <num>,  0..300" }
 
-  commands['add']         =  { :name => 'add',      :command => lambda { |dir|  do_add(dir) },         :argument => String, :help => "add directory or filename <string> to the playlist, begin playing" }
-  commands['enqueue']     =  { :name => 'enqueue',  :command => lambda { |dir|  do_enqueue(dir) },     :argument => String, :help => "add directory or filename <string> to the end of the playlist" }
+  commands['add']         =  { :name => 'add',      :command => lambda { |dir|  do_add(dir) },         :argument => String, :help => "add directory or filename <string> to the playlist, begin playing there" }
+  commands['enqueue']     =  { :name => 'enqueue',  :command => lambda { |dir|  do_enqueue(dir) },     :argument => String, :help => "add directory or filename <string> to the end of the playlist, continue with current song" }
+  commands['seek']        =  { :name => 'seek',     :command => lambda { |amount| do_seek(amount) },   :argument => String, :help => "seek +/- seconds or percent - e.g. -10 or +25% " }
 
   commands['?']           =  { :name => '?',        :command => lambda { do_help(commands) },          :argument => nil,    :help => "this help" }
   commands['clear']       =  { :name => 'clear',    :command => lambda { do_clear_playlist() },        :argument => nil,    :help => "clear the playlist" }
@@ -110,29 +115,26 @@ def execute commands, input
 
   # special cases:
 
-  return if not  command
+  return if not command
   return do_play_id(command)  if command =~ /^\d+$/ and argument.nil?
 
   completions = commands.completions(command)
 
   case completions.count
   when 0
-    usage(commands)
-    puts "This program doesn't know how to '#{command}'."
+    raise "This program doesn't know how to '#{command}'."
     return
 
   when 1
-    record   = completions[0][1]
+    name   = completions[0]
+    record = commands[name]
+
     thunk    = record[:command]
     argtype  = record[:argument]
 
-    errors = argument_errors(command, argument, argtype)
+    errors = argument_errors(name, argument, argtype)
 
-    if errors
-      usage(commands)
-      puts errors
-      return
-    end
+    raise errors if errors
 
     return thunk.call()              if argtype == nil
     return thunk.call(argument.to_i) if argtype == Fixnum
@@ -140,8 +142,7 @@ def execute commands, input
 
     raise "Don't know what to do... for arguments of class '#{argtype}'"
   else
-    puts "'#{input}' is ambiguous (could be '#{completions.map{ |rec| rec[0] }.join("', '")}')."
-    return nil
+    raise "The '#{input}' command is ambiguous (could be '#{completions.join("', '")}')."
   end
 end
 
@@ -150,11 +151,11 @@ def argument_errors name, argval, argtype
 
   return case
          when (not argval.nil? and argtype.nil? )
-           "The '#{name}' command takes no arguments."
-         when ((argval !~ /^\d+$/ and argtype == Fixnum) or (argval.nil? and argtype == Fixnum))
-           "The '#{name}' command takes a number as an argument."
+           "The '#{name}' command requires no parameters."
+         when ((argval !~ /^-?+\d+$/ and argtype == Fixnum) or (argval.nil? and argtype == Fixnum))
+           "The '#{name}' command requires a number parameter."
          when (argval.nil? and argtype == String)
-           "The '#{name}' command takes a string as an argument."
+           "The '#{name}' command requires a string parameter."
          else
            nil
          end
@@ -192,6 +193,18 @@ rescue Timeout::Error => e
   raise "Timed out after #{time} seconds"
 end
 
+# remove unuseful junk from a file/directory name
+
+def cleanup_pathname path
+  return path.gsub(MUSIC_ROOT, '').gsub(/file:\/+/, '').gsub(/^\/+/, '')
+end
+
+
+def summary status
+
+
+end
+
 # pretty_status(status) - status is a json-derived hash, print it out somewhat pretty
 
 def pretty_status status
@@ -199,7 +212,6 @@ def pretty_status status
   status.keys.sort.each { |k| strings.push sprintf("%15s: %s", k, status[k].inspect) }
   return strings.join("\n")
 end
-
 
 
 # get_status() - returns data about the current cvlc status - can be as complex as:
@@ -359,6 +371,7 @@ def id_now_playing status
   return (status['state'] == 'playing' ? status['currentplid'].to_i.to_s : nil)
 end
 
+
 # currently_playing() returns a pretty string indicating the song
 # playing, or, if nothing is playing, the string 'idle'
 
@@ -367,7 +380,7 @@ def currently_playing
   status = get_status()
   get_playlist().each do |elt|
     if elt['id'].to_s == id_now_playing(status)
-      return sprintf("*   %03d -  %s", elt['id'], URI.decode(elt['uri'].gsub(MUSIC_ROOT, '').gsub(/^\/+/, '')))
+      return sprintf("*   %03d -  %s", elt['id'], cleanup_pathname(URI.decode(elt['uri'])))
     end
   end
   return 'idle'
@@ -406,7 +419,7 @@ def do_list
   output = []
   get_playlist().each do |elt|
     marker = (elt['id'].to_s == id_now_playing(status) ? '*' : ' ')
-    output.push sprintf("%s   %03d -  %s", marker, elt['id'], URI.decode(elt['uri'].gsub(MUSIC_ROOT, '').gsub(/^\/+/, '')))
+    output.push sprintf("%s   %03d -  %s", marker, elt['id'], cleanup_pathname(URI.decode(elt['uri'])))
   end
   return output.join("\n")
 end
@@ -416,10 +429,10 @@ end
 # do so at some point when we make this a class)
 
 def do_add pathname = nil
-  raise "add requires a pathname" if pathname.nil?
-  raise "No such file or directory '#{pathname}'" unless File.exists? "#{MUSIC_ROOT}/#{pathname}"
+  raise "The 'add' command requires a pathname" if pathname.nil?
+  raise "No such file or directory '{pathname}'" unless File.exists? "#{MUSIC_ROOT}/#{pathname}"
   string = URI.encode(pathname.sub(%r{/+$},'')).gsub('&', '%26')
-  do_command("requests/status.json?command=in_play&input=#{MUSIC_ROOT}/#{string}&option=novideo")
+  do_command("requests/status.json?command=in_play&input=file://#{MUSIC_ROOT}/#{string}&option=novideo")
   return currently_playing()
 end
 
@@ -477,6 +490,15 @@ def do_toggle_repeat
   return currently_playing()
 end
 
+def do_seek amount
+  if amount =~ %r{^[+-]?\d+\%?$}
+    do_command("requests/status.json?command=seek&val=#{URI.encode(amount)}")
+  else
+    raise "Ill-formed seek amount '#{amount}'"
+  end
+  return
+end
+
 def do_help commands
   usage(commands)
   return
@@ -487,8 +509,7 @@ def do_art
   return art.inspect
 end
 
-def do_enqueue pathname = nil
-  raise "enqueue requires a pathname" if pathname.nil?
+def do_enqueue pathname
   string = URI.encode(pathname.sub(%r{/+$},''))
   do_command("requests/status.json?command=in_enqueue&input=#{MUSIC_ROOT}/#{string}")
   return currently_playing()
@@ -533,9 +554,9 @@ end
 
 
 def do_volume num = nil
-  raise "volume requires an integer value between 1 and 300..." if num.nil?
-  raise "volume requires an integer value between 1 and 300..." if num.to_i > 300
-  raise "volume requires an integer value between 1 and 300..." if num.to_i < 1
+  raise "The 'volume' command requires an integer value between 1 and 300..." if num.nil?
+  raise "The 'volume' command requires an integer value between 1 and 300..." if num.to_i > 300
+  raise "The 'volume' command requires an integer value between 1 and 300..." if num.to_i < 1
 
   do_command("requests/status.json?command=volume&val=#{num}")
   sleep STATUS_PAUSE
@@ -544,4 +565,4 @@ end
 
 
 
-main()
+main(setup_commands)
