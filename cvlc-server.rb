@@ -277,7 +277,7 @@ class CvlcServer
   # do so at some point when we make this a class)
 
   def do_add pathname
-    raise CvlcServerError, "No such file or directory '{pathname}'" unless File.exists? "#{@music_root}/#{pathname}"
+    raise CvlcServerError, "No such file or directory '#{pathname}'" unless File.exists? "#{@music_root}/#{pathname}"
     string = URI.encode(pathname.sub(%r{/+$},'')).gsub('&', '%26')
     do_command("requests/status.json?command=in_play&input=file://#{@music_root}/#{string}&option=novideo")
     return currently_playing()
