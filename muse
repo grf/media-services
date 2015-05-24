@@ -25,13 +25,6 @@ require 'cvlc-server'
 
 class MuseError < StandardError; end
 
-@http = 'http://satyagraha.sacred.net:9090/'   # adjust for the address of server.
-@pass = 'foo'
-@user = ''
-
-# TODO: STATUS_PAUSE doesn't belong here
-
-MUSIC_ROOT      = '/data/Music'           # Where my music is stored; we'll include this when sending a pathname to the cvlc server, which can look for locally.
 STDOUT.sync     = true                    # REPL needs immediate flush
 
 # Top level REPL (Read-Eval-Print Loop).
@@ -49,6 +42,8 @@ rescue => exception
   retry
 end
 
+private
+
 def goodbye
   writeln "Goodbye, and thanks for all the fish!"
   exit
@@ -56,9 +51,9 @@ end
 
 def error_message supported_commands, exception
   writeln supported_commands.usage, "\n", exception.message
-#  unless [ ClvcServerError, CommandExecutorError, MuseError ].include? exception.class
+  unless [ CvlcServerError, CommandExecutorError, MuseError ].include? exception.class
     writeln exception.class, "\n", exception.backtrace.join("\n")
-#  end
+  end
 end
 
 # The 'P' in the REPL: write(text, text...) ship out supplied text
@@ -94,11 +89,11 @@ def execute supported, command
 end
 
 # The setup_commands() creates the CommandEexcutor object, providing
-# all the information needed for executing the functions the user
-# enters in the REPL loop, as well as providing help text, etc.
+# all the information needed for executing the various functions the
+# user enters in the REPL loop, as well as providing help text, etc.
 
-def setup_commands
-  cvlc = CvlcServer.new "http://:foo@satyagraha.sacred.net:9090/"
+def setup_commands server, music_root
+  cvlc = CvlcServer.new server, music_root
   commands = CommandExecutor.new
 
   commands.add('delete',   lambda { |id|  cvlc.do_delete_id(id) },     Fixnum,  "remove item <num> from the playlist")
@@ -125,4 +120,4 @@ def setup_commands
   return commands
 end
 
-main(setup_commands)
+main(setup_commands("http://:foo@satyagraha.sacred.net:9090/", "/data/Music/"))

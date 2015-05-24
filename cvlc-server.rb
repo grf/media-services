@@ -13,7 +13,11 @@ class CvlcServer
 
   # e.g. "http://user:password@satyagraha.sacred.net:9090/"
 
-  def initialize server_url
+  def initialize server_url, music_root
+    @music_root = music_root.gsub(/\/+$/, '')
+
+    # TODO: check that music_root exists
+
     setup(server_url)  # sets up @server_handle, @user, @password
   end
 
@@ -42,7 +46,7 @@ class CvlcServer
   # remove unuseful junk from a file/directory name
 
   def cleanup_pathname path
-    return path.gsub(MUSIC_ROOT, '').gsub(/file:\/+/, '').gsub(/^\/+/, '')
+    return path.gsub(@music_root, '').gsub(/file:\/+/, '').gsub(/^\/+/, '')
   end
 
   # pretty_status(status) - status is a json-derived hash, print it out somewhat pretty
@@ -154,8 +158,6 @@ class CvlcServer
     return JSON.parse(do_command('requests/status.json'))
   end
 
-
-
   def do_command command
     command  = [ @server_handle, '/', command ].join
     resource =  RestClient::Resource.new(command, @user, @password)
@@ -170,7 +172,6 @@ class CvlcServer
   rescue => e
     raise CvlcServerError, "do_command: #{e}\n" + "do_command: Error tyrying to communicate wth the cvlc media service (is it running?)."
   end
-
 
   # get_playlist()  interrogates the cvlc web service and returns a list of music on the
   # current playlist;  elements of the list look as so:
@@ -230,7 +231,6 @@ class CvlcServer
     return output
   end
 
-
   # id_now_playing(status) examines the status data structure returned
   # by the cvlc service, and returns the id of the song in the playlist
   # currently playing. If nothing is playing, it returns nil.
@@ -277,9 +277,9 @@ class CvlcServer
   # do so at some point when we make this a class)
 
   def do_add pathname
-    raise CvlcServerError, "No such file or directory '{pathname}'" unless File.exists? "#{MUSIC_ROOT}/#{pathname}"
+    raise CvlcServerError, "No such file or directory '{pathname}'" unless File.exists? "#{@music_root}/#{pathname}"
     string = URI.encode(pathname.sub(%r{/+$},'')).gsub('&', '%26')
-    do_command("requests/status.json?command=in_play&input=file://#{MUSIC_ROOT}/#{string}&option=novideo")
+    do_command("requests/status.json?command=in_play&input=file://#{@music_root}/#{string}&option=novideo")
     return currently_playing()
   end
 
@@ -359,7 +359,7 @@ class CvlcServer
 
   def do_enqueue pathname
     string = URI.encode(pathname.sub(%r{/+$},''))
-    do_command("requests/status.json?command=in_enqueue&input=#{MUSIC_ROOT}/#{string}")
+    do_command("requests/status.json?command=in_enqueue&input=#{@music_root}/#{string}")
     return currently_playing()
   end
 
