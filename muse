@@ -57,9 +57,12 @@ def setup_commands server, music_root
   return commands
 end
 
+
+# main()
+
 commands = setup_commands("http://:foo@satyagraha.sacred.net:9090/", "/data/Music/")
 
 repl = MuseRepl.new commands, 'muse> '
-repl.debug = true
+repl.debug = false
 
 repl.loop
