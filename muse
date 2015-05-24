@@ -17,14 +17,7 @@ require 'cvlc-server'
 
 class MuseError < StandardError; end
 
-class MuseRepl < Repl
-  def execute command
-    command = "play " + command if command.strip =~ /^\d+$/
-    super(command)
-  end
-end
-
-def setup_commands server, music_root
+def commands server, music_root
   cvlc = CvlcServer.new server, music_root
 
   raise MuseError, "Can't connect to music server" unless cvlc.ping
@@ -39,7 +32,7 @@ def setup_commands server, music_root
   commands.add('enqueue',  lambda { |dir|  cvlc.do_enqueue(dir) },     String,  "add directory or filename <string> to the end of the playlist, continue with current song")
   commands.add('seek',     lambda { |amount|  cvlc.do_seek(amount) },  String,  "seek +/- seconds or percent - e.g. -10 or +25% ")
 
-  # cvlc.do_help(commands) is problematic... do_help should be moved up here, sorta... delegate across all kinds of commands (like vsx.methods when we do that?
+  # cvlc.do_help(commands) may be problematic... do_help should be moved up here, sorta... delegate across all kinds of commands (like vsx.methods when we do that?
 
   commands.add('?',        lambda { cvlc.do_help(commands) },          nil,     "this help")
   commands.add('clear',    lambda { cvlc.do_clear_playlist() },        nil,     "clear the playlist")
@@ -57,12 +50,15 @@ def setup_commands server, music_root
   return commands
 end
 
+class MuseRepl < Repl
+  def execute command
+    command = "play " + command if command.strip =~ /^\d+$/
+    super(command)
+  end
+end
 
 # main()
 
-commands = setup_commands("http://:foo@satyagraha.sacred.net:9090/", "/data/Music/")
-
-repl = MuseRepl.new commands, 'muse> '
-repl.debug = false
+repl = MuseRepl.new(commands("http://:foo@satyagraha.sacred.net:9090/", "/data/Music/"), 'muse> ')
 
 repl.loop

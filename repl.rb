@@ -13,7 +13,7 @@ class Repl
     @commands = command_exectutor
     @prompt   = prompt
     @goodbye  = goodbye_message
-    raise ReplError, "The first argument must be a CommandExecutor" unless @commands.is_a? CommandExecutor
+    raise ReplError, "The first argument must be a CommandExecutor object" unless @commands.is_a? CommandExecutor
   end
 
   # Top level REPL (Read-Eval-Print Loop).
@@ -58,9 +58,6 @@ class Repl
 
   # The 'E' in the REPL is mostly done by the CommandExecutor object
   # method CommandExecutor#execute(String).
-  #
-  # Here we're just fielding any special conditions specific to this
-  # program.
 
   def execute command
     return @commands.execute(command)
@@ -79,9 +76,7 @@ class Repl
 
   def exception_message exception
     writeln @commands.usage, "\n", exception.message
-    if debug
-      writeln exception.class, "\n", exception.backtrace.join("\n")
-    end
+    writeln exception.class, "\n", exception.backtrace.join("\n") if debug
   end
 
 end
