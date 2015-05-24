@@ -12,12 +12,6 @@
 # you communicate with the cvlc server, so that you can maintain a
 # playlist, adjust volumes, next/prev/random controls, etc.
 
-
-require 'json'
-require 'rest-client'
-require 'uri'
-require 'timeout'
-
 $LOAD_PATH.unshift File.dirname(__FILE__)
 
 require 'command-executor'
@@ -103,6 +97,8 @@ def setup_commands server, music_root
   commands.add('add',      lambda { |dir|  cvlc.do_add(dir) },         String,  "add directory or filename <string> to the playlist, begin playing there")
   commands.add('enqueue',  lambda { |dir|  cvlc.do_enqueue(dir) },     String,  "add directory or filename <string> to the end of the playlist, continue with current song")
   commands.add('seek',     lambda { |amount|  cvlc.do_seek(amount) },  String,  "seek +/- seconds or percent - e.g. -10 or +25% ")
+
+  # cvlc.do_help(commands) is problematic... do_help should be moved up here, sorta... delegate across all kinds of commands (like vsx.methods when we do that?
 
   commands.add('?',        lambda { cvlc.do_help(commands) },          nil,     "this help")
   commands.add('clear',    lambda { cvlc.do_clear_playlist() },        nil,     "clear the playlist")
