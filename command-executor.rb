@@ -87,7 +87,7 @@ class CommandExecutor
     texts = []
     usage_notes.each { |rec| texts.push sprintf("%#{max + 1}s:  %s\n", rec[:signature], rec[:help]) }
 
-    return texts
+    return texts.join
   end
 
 end
