@@ -12,6 +12,8 @@
 # you communicate with the cvlc server, so that you can maintain a
 # playlist, adjust volumes, next/prev/random controls, etc.
 
+# TODO: abstract REPL into a class if possible
+
 $LOAD_PATH.unshift File.dirname(__FILE__)
 
 require 'command-executor'
@@ -42,6 +44,8 @@ def goodbye
   writeln "Goodbye, and thanks for all the fish!"
   exit
 end
+
+# TODO: abstract away list of covered exceptions
 
 def error_message supported_commands, exception
   writeln supported_commands.usage, "\n", exception.message
