@@ -394,9 +394,9 @@ class CvlcServer
   # 100 == 0 for some reason...
 
   def do_volume num
-    raise CvlcServerError, "The 'volume' command requires an integer value between 1 and 300..." if num.to_i > 300
-    raise CvlcServerError, "The 'volume' command requires an integer value between 1 and 300..." if num.to_i < 1
-
+    if (num.to_i > 300 or num.to_i < 1)
+      raise CvlcServerError, "The 'volume' command requires an integer value between 1 and 300..."
+    end
     do_command("requests/status.json?command=volume&val=#{num}")
     sleep STATUS_PAUSE
     return pretty_status(get_status())
