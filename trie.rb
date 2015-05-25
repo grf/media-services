@@ -6,7 +6,8 @@
 # TODO: add delete method
 
 
-# Randy Fischer (rf@ufl.edu) reimplemented this wheel on 2010-06-13.  Pleasant exercise.
+# Randy Fischer (rf@ufl.edu) first reimplemented this wheel on
+# 2010-06-13.  Pleasant exercise.
 #
 # Build a trie (a kind of sorted hash) - my initial goal was to find
 # the largest common prefix from a list of strings.  This also does
@@ -109,10 +110,8 @@ class Trie
     end
   end
 
-  # TODO: this behavoir seems unexpected... just return matching keys?
-
-  # completion(string) returns [ [ key, val ], [ key, val ] ... ] from
-  # the trie object, where string is substring (including an exact
+  # completion(match_string) returns and array of keys from
+  # the trie object, where match_string is substring (including an exact
   # match) of all the returned keys. While key is a string, val can be
   # pretty much anything.  The keys are returned sorted.
 
