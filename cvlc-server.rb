@@ -54,6 +54,7 @@ class CvlcServer
   # pretty_status(status) - status is a json-derived hash, print it out somewhat pretty
 
   def pretty_status(status)
+    # return JSON.pretty_generate(status)
     strings = []
     status.keys.sort.each { |k| strings.push format("%15s: %s\n", k, status[k].inspect) }
     return strings.join
@@ -228,16 +229,16 @@ class CvlcServer
         output.push elt
       end
     else
-      fail CvlcServerError, "Unexpected playlist output: \n" + JSON.pretty_generate(current_playlist)
+      fail CvlcServerError, "Unexpected playlist output: \n" + JSON.pretty_generate(playlist)
     end
     return output
   end
 
-  # id_now_playing(status) examines the status data structure returned
+  # find_id_now_playing(status) examines the status data structure returned
   # by the cvlc service, and returns the id of the song in the playlist
   # currently playing. If nothing is playing, it returns nil.
 
-  def id_now_playing(status)
+  def find_id_now_playing(status)
     return (status['state'] == 'playing' ? status['currentplid'].to_i.to_s : nil)
   end
 
@@ -246,7 +247,7 @@ class CvlcServer
 
   def currently_playing
     sleep STATUS_PAUSE
-    id_playing = id_now_playing(current_status)
+    id_playing = find_id_now_playing(current_status)
     current_playlist.each do |elt|
       if elt['id'].to_s == id_playing
         return format('*   %03d -  %s', elt['id'], cleanup_pathname(elt['uri']))
@@ -264,7 +265,7 @@ class CvlcServer
   # asterisk. Empty return text is possible.
 
   def do_list
-    now_playing =  id_now_playing(current_status)
+    now_playing = find_id_now_playing(current_status)
     output = []
     current_playlist.each do |elt|
       marker = (elt['id'].to_s == now_playing ? '*' : ' ')
