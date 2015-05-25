@@ -21,11 +21,11 @@ def setup_commands(server, music_root)
 
   cvlc = CvlcServer.new(server, music_root)
 
-  raise MuseError, "Can't connect to music server" unless cvlc.ping
+  fail MuseError, "Can't connect to music server" unless cvlc.ping
 
   commands = CommandExecutor.new
 
-  # cvlc.do_help(commands) may be problematic... do_help should be moved up here, sorta... delegate across all kinds of commands (like vsx.methods when we do that?
+  # cvlc.do_help(commands) may be problematic...
 
   [
     [ 'delete',   ->(id)  { cvlc.do_delete_id(id) }, Fixnum,  'remove item <num> from the playlist' ],
@@ -35,7 +35,6 @@ def setup_commands(server, music_root)
     [ 'add',      ->(dir) { cvlc.do_add(dir) },      String,  'add directory or filename <string> to the playlist, begin playing there' ],
     [ 'enqueue',  ->(dir) { cvlc.do_enqueue(dir) },  String,  'add directory or filename <string> to the end of the playlist, continue with current song' ],
     [ 'seek',     ->(amt) { cvlc.do_seek(amt) },     String,  'seek +/- seconds or percent - e.g. -10 or +25% ' ],
-
 
     [ '?',        -> { cvlc.do_help(commands) },  nil,  'this help' ],
     [ 'clear',    -> { cvlc.do_clear_playlist },  nil,  'clear the playlist' ],
@@ -62,9 +61,9 @@ class MuseRepl < Repl
   end
 end
 
-# main
+# main()
 
-cmds = setup_commands('http://:foo@satyagraha.sacred.net:9090/', '/data/Music/')
-muse = MuseRepl.new(cmds, 'muse> ')
-
+cmdr = setup_commands('http://:foo@satyagraha.sacred.net:9090/', '/data/Music/')
+muse = MuseRepl.new(cmdr, 'muse> ')
+muse.debug = false
 muse.repl

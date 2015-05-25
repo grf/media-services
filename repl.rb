@@ -4,8 +4,12 @@ require 'command-executor'
 
 class ReplError < StandardError; end
 
+# Repl creates objects that hides the details for a general Read-Eval-Print Loop.
+
 class Repl
-  @@debug      = false
+
+  attr_accessor :debug
+
   $stdout.sync = true                    # REPL needs immediate flush.   stdout?
 
   def initialize(command_exectutor, prompt = 'repl> ', goodbye_message = 'Thanks for all the fish!')
@@ -28,10 +32,6 @@ class Repl
   rescue => e
     exception_message(e)
     retry
-  end
-
-  def debug=(val)
-    @@debug = val
   end
 
   # write, writeln, get, execute are provided for subclassing
@@ -65,10 +65,6 @@ class Repl
   end
 
   private
-
-  def debug
-    @@debug
-  end
 
   def goodbye
     writeln @goodbye

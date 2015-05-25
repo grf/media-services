@@ -24,7 +24,7 @@ class Trie
 
     attr_reader :value
 
-    def initialize thing
+    def initialize(thing)
       @value = thing
     end
 
@@ -33,7 +33,7 @@ class Trie
     end
 
     def to_s
-      "#<box##{self.object_id}: #{value.inspect}>"
+      "#<box##{object_id}: #{value.inspect}>"
     end
   end
 
@@ -46,7 +46,7 @@ class Trie
     attr_reader   :letter, :children
     attr_accessor :value
 
-    def initialize letter = ''
+    def initialize(letter = '')
       @letter     = letter
       @children   = []
       @value      = nil
@@ -54,7 +54,7 @@ class Trie
 
     # Create a new child node that stored the string LETTER.  Returns the new node.
 
-    def add_child letter
+    def add_child(letter)
       new_node = Node.new(letter)
       @children.push new_node
       @children.sort! { |node_a, node_b| node_a.letter <=> node_b.letter }
@@ -70,22 +70,22 @@ class Trie
     @root = Node.new
   end
 
-  def [] key
+  def [](key)
     val = lookup(key)
     val.nil? ? nil : val.unwrap
   end
 
 
-  def []= key, val
+  def []=(key, val)
     store(key, Box.new(val))
     return val
   end
 
   # Return longest common prefix from the trie.
 
-  def prefix node = root, str = ''
-    return str + node.letter if node.children.count != 1 or not node.value.nil?
-    return prefix node.children[0], str + node.letter
+  def prefix(node = root, str = '')
+    return str + node.letter if node.children.count != 1 || !node.value.nil?
+    return prefix(node.children[0], str + node.letter)
   end
 
   def keys
@@ -97,13 +97,13 @@ class Trie
   def values
     collection = []
     find_values collection
-    collection.map { |box| box.unwrap }
+    collection.map(&:unwrap)
   end
 
   # Huh.  Must be for debugging or sumthin...
 
-  def dump node = root, indent = ''
-    STDERR.puts indent + node.letter + (node.value.nil? ? "" : " " + node.value.inspect) unless node == root
+  def dump(node = root, indent = '')
+    STDERR.puts indent + node.letter + (node.value.nil? ? '' : ' ' + node.value.inspect) unless node == root
     node.children.each do |n|
       dump n, indent + '→  '
     end
@@ -116,33 +116,34 @@ class Trie
   # match) of all the returned keys. While key is a string, val can be
   # pretty much anything.  The keys are returned sorted.
 
-  def completions string
+  def completions(string)
     completions = []
-    completions_helper '', string, root, completions
+    completions_helper('', string, root, completions)
     return completions
   end
 
   private
 
-  def completions_helper matched, pending, node, completions
+  def completions_helper(matched, pending, node, completions)
+
     # two cases:
 
-    # 1) pending is empty, so we've matched the entire string; record
-    # the key/value if the current node has a value, then check the
-    # children to see if we're a prefix for other nodes.
+    if pending.empty? || pending.nil?
 
-    if pending.empty? or pending.nil?
+      # 1) pending is empty, so we've matched the entire string; record
+      # the key/value if the current node has a value, then check the
+      # children to see if we're a prefix for other nodes.
 
       completions.push matched if node.value
       node.children.each { |nd| completions_helper(matched + nd.letter, pending, nd, completions) }
 
     else
 
-    # 2) pending has more letters to consume, so we need to look-ahead
-    # at children for a match, recursion will record values.
+      # 2) pending has more letters to consume, so we need to look-ahead
+      # at children for a match, recursion will record values.
 
       nletter, pending = pending[0..0], pending[1..-1]
-      matched = matched + nletter
+      matched += nletter
 
       node.children.each { |nd| completions_helper(matched, pending, nd, completions) if nd.letter == nletter }
     end
@@ -150,13 +151,13 @@ class Trie
 
   # Store a value for a key. Used for []= above.
 
-  def store key, val, node = root
+  def store(key, val, node = root)
 
     head = key[0..0]              # divide and conquer
     tail = key[1..-1]
 
-    found = node.children.select { |n| n.letter == head }.first   # look for our letter in the children..
-    found ||=  node.add_child head                                # create a node for it if need be.
+    found = node.children.find { |n| n.letter == head }   # look for our letter in the children..
+    found ||= node.add_child head                         # create a node for it if need be.
 
     if tail.empty?                # we're done; save value
       found.value = val
@@ -167,7 +168,7 @@ class Trie
 
   # Find all keys. Helper for method keys.
 
-  def find_keys collection, node = root, str = ''
+  def find_keys(collection, node = root, str = '')
     collection.push str + node.letter unless node.value.nil?
     node.children.each do |nd|
       find_keys collection, nd, str + node.letter
@@ -177,7 +178,7 @@ class Trie
   # Find all values, same order as corresponding keys are
   # returned. Helper for method values.
 
-  def find_values collection, node = root, str = ''
+  def find_values(collection, node = root, str = '')
     collection.push node.value unless node.value.nil?
     node.children.each do |nd|
       find_values collection, nd, str + node.letter
@@ -186,7 +187,7 @@ class Trie
 
   # Lookup value for a key. Used for []
 
-  def lookup key, node = root
+  def lookup(key, node = root)
     return nil if key.empty?
 
     head = key[0..0]
@@ -194,7 +195,7 @@ class Trie
 
     node.children.each do |nd|
       next unless head == nd.letter
-      return nd.value if tail.empty? and not nd.value.nil?
+      return nd.value if tail.empty? && !nd.value.nil?
       return lookup tail, nd
     end
 

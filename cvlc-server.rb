@@ -11,21 +11,20 @@ class CvlcServer
   QUICKLY_TIMEOUT = 1.75                    # How long to wait for a response from the CVLC server
   STATUS_PAUSE    = 0.25                    # Some commands need a little time to set up, or to complete.  This value should be less than 1 sec, ideally less than 300 msec.
 
-  # e.g. "http://user:password@satyagraha.sacred.net:9090/"
+  # e.g. 'http://user:password@satyagraha.sacred.net:9090/'
 
-  def initialize server_url, music_root
-    @music_root = music_root.gsub(/\/+$/, '')
-
-    # TODO: check that music_root exists
-
+  def initialize(server_url, music_root)
+    @music_root = music_root.gsub(%r{/+$}, '')
+    fail "#{@music_root} is not a valid directory" unless File.exist?(@music_root) && File.directory?(@music_root)
+    fail "#{@music_root} is not readable"          unless File.readable?(@music_root)
     setup(server_url)  # sets up @server_handle, @user, @password
   end
 
   private
 
-  def setup server_url
+  def setup(server_url)
     uri = URI.parse server_url
-    server_handle = uri.scheme + "://" + uri.host + (uri.port == 80 ? "" : ":#{uri.port}")
+    server_handle = uri.scheme + '://' + uri.host + (uri.port == 80 ? '' : ":#{uri.port}")
 
     @server_handle = server_handle
     @user          = uri.user
@@ -35,32 +34,32 @@ class CvlcServer
     raise "Can't parse server URL '#{server_url}': #{e.class} #{e.message}'"   # we don't use CvlcServerError in this case because we want to fail hard. TODO: wtf?
   end
 
-  def quickly time = QUICKLY_TIMEOUT
+  def quickly(time = QUICKLY_TIMEOUT)
     Timeout.timeout(time) do
       yield
     end
-  rescue Timeout::Error => e
+  rescue Timeout::Error
     raise CvlcServerError, "Timed out after #{time} seconds"
   end
 
   # remove unuseful junk from a file/directory name
 
-  def cleanup_pathname path
-    return path.gsub(@music_root, '').gsub(/file:\/+/, '').gsub(/^\/+/, '')
+  def cleanup_pathname(path)
+    return path.gsub(@music_root, '').gsub(%r{file:/+}, '').gsub(%r{^/+}, '')
   end
 
   # pretty_status(status) - status is a json-derived hash, print it out somewhat pretty
 
-  def pretty_status status
+  def pretty_status(current_status)
     strings = []
-    status.keys.sort.each { |k| strings.push sprintf("%15s: %s", k, status[k].inspect) }
-    return strings.join("\n")
+    current_status.keys.sort.each { |k| strings.push format("%15s: %s\n", k, current_status[k].inspect) }
+    return strings.join
   end
 
   public
 
   def ping
-    get_status
+    status
     return true
   rescue
     return false
@@ -68,7 +67,7 @@ class CvlcServer
 
   private
 
-  # get_status() - returns data about the current cvlc status - can be as complex as:
+  # status - returns data about the current cvlc status - can be as complex as:
   #
   # {
   #   "loop": false,
@@ -154,26 +153,26 @@ class CvlcServer
   #   "fullscreen": 0
   # }
 
-  def get_status
+  def status
     return JSON.parse(do_command('requests/status.json'))
   end
 
-  def do_command command
+  def do_command(command)
     command  = [ @server_handle, '/', command ].join
     resource =  RestClient::Resource.new(command, @user, @password)
 
     response = quickly do
       res = resource.get
-      raise CvlcServerError, "Bad response code #{response.code} for command '#{command}'" unless res.code < 300
+      fail CvlcServerError, "Bad response code #{response.code} for command '#{command}'" unless res.code < 300
       res
     end
 
     return response
   rescue => e
-    raise CvlcServerError, "do_command: #{e}\n" + "do_command: Error tyrying to communicate wth the cvlc media service (is it running?)."
+    raise CvlcServerError, "do_command: #{e}\n" + 'do_command: Error tyrying to communicate wth the cvlc media service (is it running?).'
   end
 
-  # get_playlist()  interrogates the cvlc web service and returns a list of music on the
+  # playlist  interrogates the cvlc web service and returns a list of music on the
   # current playlist;  elements of the list look as so:
   #
   # {
@@ -214,41 +213,40 @@ class CvlcServer
   #
 
 
-  def get_playlist
-    playlist = JSON.parse(do_command('requests/playlist.json'))
-    inner    = playlist['children'].first
+  def playlist
+    current_playlist = JSON.parse(do_command('requests/playlist.json'))
+    inner    = current_playlist['children'].first
     output   = []
 
-    if inner['name'] =~ /playlist/i and inner['children'].class == Array
+    if inner['name'] =~ /playlist/i && inner['children'].class == Array
       inner['children'].each do |elt|
         next unless elt['type'] == 'leaf'
-        next if elt['uri']  == 'vlc://nop'
+        next if elt['uri'] == 'vlc://nop'
         output.push elt
       end
     else
-      raise CvlcServerError, "Unexpected playlist output: \n" + JSON.pretty_generate(playlist)
+      fail CvlcServerError, "Unexpected playlist output: \n" + JSON.pretty_generate(current_playlist)
     end
     return output
   end
 
-  # id_now_playing(status) examines the status data structure returned
+  # id_now_playing(current_status) examines the current_status data structure returned
   # by the cvlc service, and returns the id of the song in the playlist
   # currently playing. If nothing is playing, it returns nil.
 
-  def id_now_playing status
-    return (status['state'] == 'playing' ? status['currentplid'].to_i.to_s : nil)
+  def id_now_playing(current_status)
+    return (current_status['state'] == 'playing' ? current_status['currentplid'].to_i.to_s : nil)
   end
 
-
-  # currently_playing() returns a pretty string indicating the song
+  # currently_playing returns a pretty string indicating the song
   # playing, or, if nothing is playing, the string 'idle'
 
   def currently_playing
     sleep STATUS_PAUSE
-    status = get_status()
-    get_playlist().each do |elt|
-      if elt['id'].to_s == id_now_playing(status)
-        return sprintf("*   %03d -  %s", elt['id'], cleanup_pathname(URI.decode(elt['uri'])))
+    id_playing = id_now_playing(status)
+    playlist.each do |elt|
+      if elt['id'].to_s == id_playing
+        return format('*   %03d -  %s', elt['id'], cleanup_pathname(URI.decode(elt['uri'])))
       end
     end
     return 'idle'
@@ -258,16 +256,16 @@ class CvlcServer
 
   ## Top level commands
 
-  # do_list() returns the playlist pretty-printed, highlighting the
+  # do_list returns the playlist pretty-printed, highlighting the
   # currently playing entry (if one is being played) with an
   # asterisk. Empty return text is possible.
 
   def do_list
-    status = get_status()
+    now_playing =  id_now_playing(status)
     output = []
-    get_playlist().each do |elt|
-      marker = (elt['id'].to_s == id_now_playing(status) ? '*' : ' ')
-      output.push sprintf("%s   %03d -  %s\n", marker, elt['id'], cleanup_pathname(URI.decode(elt['uri'])))
+    playlist.each do |elt|
+      marker = (elt['id'].to_s == now_playing ? '*' : ' ')
+      output.push format("%s   %03d -  %s\n", marker, elt['id'], cleanup_pathname(URI.decode(elt['uri'])))
     end
     return output.join
   end
@@ -276,41 +274,41 @@ class CvlcServer
   # name should not include full URI path (TODO: we'll have to make it
   # do so at some point when we make this a class)
 
-  def do_add pathname
-    raise CvlcServerError, "No such file or directory '#{pathname}'" unless File.exists? "#{@music_root}/#{pathname}"
-    string = URI.encode(pathname.sub(%r{/+$},'')).gsub('&', '%26')
+  def do_add(pathname)
+    fail CvlcServerError, "No such file or directory '#{pathname}'" unless File.exist? "#{@music_root}/#{pathname}"
+    string = URI.encode(pathname.sub(%r{/+$}, '')).gsub('&', '%26')
     do_command("requests/status.json?command=in_play&input=file://#{@music_root}/#{string}&option=novideo")
-    return currently_playing()
+    return currently_playing
   end
 
-  # do_status() - returns a compact list of the returned json.
+  # do_status - returns a compact list of the returned json.
 
   def do_status
-    return pretty_status(get_status)
+    return pretty_status(status)
   end
 
-  # do_next() - do next entry on playlist, wraps around
+  # do_next - do next entry on playlist, wraps around
 
   def do_next
     do_command('requests/status.json?command=pl_next')
-    return currently_playing()
+    return currently_playing
   end
 
-  # do_previous() - do previous entry on playlist, wraps around
+  # do_previous - do previous entry on playlist, wraps around
 
   def do_previous
     do_command('requests/status.json?command=pl_previous')
-    return currently_playing()
+    return currently_playing
   end
 
-  def do_play_id id
+  def do_play_id(id)
     do_command("requests/status.json?command=pl_play&id=#{id.to_i}")
-    return currently_playing()
+    return currently_playing
   end
 
-  def do_delete_id id
+  def do_delete_id(id)
     do_command("requests/status.json?command=pl_delete&id=#{id.to_i}")
-    return currently_playing()
+    return currently_playing
   end
 
   def do_raw_list
@@ -324,7 +322,7 @@ class CvlcServer
 
   def do_toggle_random
     do_command('requests/status.json?command=pl_random')
-    return currently_playing()
+    return currently_playing
   end
 
   def do_toggle_loop
@@ -334,33 +332,33 @@ class CvlcServer
 
   def do_toggle_repeat
     do_command('requests/status.json?command=pl_repeat')
-    return currently_playing()
+    return currently_playing
   end
 
-  def do_seek amount
+  def do_seek(amount)
     if amount =~ %r{^[+-]?\d+\%?$}
       do_command("requests/status.json?command=seek&val=#{URI.encode(amount)}")
     else
-      raise CvlcServerError, "Ill-formed seek amount '#{amount}'"
+      fail CvlcServerError, "Ill-formed seek amount '#{amount}'"
     end
     return
   end
 
   # the scoping for using this is pretty atrocious, see setup_commands
 
-  def do_help commands
+  def do_help(commands)
     return commands.usage
   end
 
   def do_art
-    art = do_command('art');
+    art = do_command('art')
     return art.inspect
   end
 
-  def do_enqueue pathname
-    string = URI.encode(pathname.sub(%r{/+$},''))
+  def do_enqueue(pathname)
+    string = URI.encode(pathname.sub(%r{/+$}, ''))
     do_command("requests/status.json?command=in_enqueue&input=#{@music_root}/#{string}")
-    return currently_playing()
+    return currently_playing
   end
 
   # Doesn't seem to work
@@ -393,13 +391,13 @@ class CvlcServer
 
   # 100 == 0 for some reason...
 
-  def do_volume num
-    if (num.to_i > 300 or num.to_i < 1)
-      raise CvlcServerError, "The 'volume' command requires an integer value between 1 and 300..."
+  def do_volume(num)
+    if num.to_i > 300 || num.to_i < 1
+      fail CvlcServerError, "The 'volume' command requires an integer value between 1 and 300..."
     end
     do_command("requests/status.json?command=volume&val=#{num}")
     sleep STATUS_PAUSE
-    return pretty_status(get_status())
+    return pretty_status(status)
   end
 
-end
+end  # class CvlcServer
