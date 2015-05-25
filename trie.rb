@@ -85,7 +85,7 @@ class Trie
   # Return longest common prefix from the trie.
 
   def prefix(node = root, str = '')
-    return str + node.letter if node.children.count != 1 || !node.value.nil?
+    return str + node.letter if node.children.count != 1 || ! node.value.nil?
     return prefix(node.children[0], str + node.letter)
   end
 
@@ -194,7 +194,7 @@ class Trie
 
     node.children.each do |nd|
       next unless head == nd.letter
-      return nd.value if tail.empty? && !nd.value.nil?
+      return nd.value if tail.empty? && ! nd.value.nil?
       return lookup tail, nd
     end
 

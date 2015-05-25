@@ -2,7 +2,7 @@
 
 require 'trie'
 
-Struct.new('Thunk', :name, :command, :argument, :help)
+Struct.new('ThunkRecord', :name, :command, :argument, :help)
 
 class CommandExecutorError < StandardError; end
 
@@ -13,7 +13,7 @@ class CommandExecutor
   end
 
   def add(name, command, argument, help)
-    @commands[name] = Struct::Thunk.new(name, command, argument, help)
+    @commands[name] = Struct::ThunkRecord.new(name, command, argument, help)
   end
 
   def execute(input)
@@ -24,7 +24,7 @@ class CommandExecutor
     completions = @commands.completions(command)
     count = completions.count
     fail CommandExecutorError, "This program doesn't know how to '#{command}'." if count == 0
-    fail CommandExecutorError, "The '#{input}' command is ambiguous (could be '#{completions.join("', '")}')." if count > 1
+    fail CommandExecutorError, "The '#{command}' command is ambiguous (could be '#{completions.join("', '")}')." if count > 1
 
     name    = completions[0]
     record  = @commands[name]
@@ -63,7 +63,7 @@ class CommandExecutor
   def usage
     usage_notes = []
 
-    # collect the usage text we'll return
+    # create an array of the usage texts we'll return
 
     @commands.values.each do |val|
       usage = val.name if val.argument.nil?
