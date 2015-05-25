@@ -4,15 +4,19 @@ require 'command-executor'
 
 class ReplError < StandardError; end
 
-# Repl creates objects that hides the details for a general Read-Eval-Print Loop.
+# Repl creates objects that hides the details for a general
+# Read-Eval-Print Loop.  It's meant to work with a CommandExecutor
+# object, which is required for instantiation.
+#
+#
 
 class Repl
 
   attr_accessor :debug
 
-  $stdout.sync = true                    # REPL needs immediate flush.   stdout?
+  $stdout.sync = true                    # REPL needs immediate flush.
 
-  def initialize(command_exectutor, prompt = 'repl> ', goodbye_message = 'Thanks for all the fish!')
+  def initialize(command_exectutor, prompt = 'repl> ', goodbye_message = 'So long, and thanks for all the fish!')
     @commands = command_exectutor
     @prompt   = prompt
     @goodbye  = goodbye_message
@@ -23,18 +27,18 @@ class Repl
 
   def repl
     loop do
-      write(@prompt)
+      write @prompt
       command = get
       goodbye if command.nil?
-      response = execute(command)
-      writeln(response.chomp) unless response.nil? || response.empty?
+      response = execute command
+      writeln response.chomp unless response.nil? || response.empty?
     end
-  rescue => e
-    exception_message(e)
+  rescue => ex
+    exception_message ex
     retry
   end
 
-  # write, writeln, get, execute are provided for subclassing
+  # write, writeln, get, and execute are provided for subclassing
 
   # The 'P' in the REPL: write(text, text...) ship out supplied text
   # strings.

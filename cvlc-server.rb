@@ -3,10 +3,14 @@
 require 'rest-client'
 require 'timeout'
 require 'uri'
+require 'cgi'
+require 'erb'
 
 class CvlcServerError < StandardError; end
 
 class CvlcServer
+
+  include ERB::Util
 
   QUICKLY_TIMEOUT = 1.75                    # How long to wait for a response from the CVLC server
   STATUS_PAUSE    = 0.25                    # Some commands need a little time to set up, or to complete.  This value should be less than 1 sec, ideally less than 300 msec.
@@ -44,7 +48,7 @@ class CvlcServer
   # remove unuseful junk from a file/directory name
 
   def cleanup_pathname(path)
-    return path.gsub(@music_root, '').gsub(%r{file:/+}, '').gsub(%r{^/+}, '')
+    return CGI.unescape(path).gsub(@music_root, '').gsub(%r{file:/+}, '').gsub(%r{^/+}, '')
   end
 
   # pretty_status(status) - status is a json-derived hash, print it out somewhat pretty
@@ -245,7 +249,7 @@ class CvlcServer
     id_playing = id_now_playing(current_status)
     current_playlist.each do |elt|
       if elt['id'].to_s == id_playing
-        return format('*   %03d -  %s', elt['id'], cleanup_pathname(URI.decode(elt['uri'])))
+        return format('*   %03d -  %s', elt['id'], cleanup_pathname(elt['uri']))
       end
     end
     return 'idle'
@@ -264,7 +268,7 @@ class CvlcServer
     output = []
     current_playlist.each do |elt|
       marker = (elt['id'].to_s == now_playing ? '*' : ' ')
-      output.push format("%s   %03d -  %s\n", marker, elt['id'], cleanup_pathname(URI.decode(elt['uri'])))
+      output.push format("%s   %03d -  %s\n", marker, elt['id'], cleanup_pathname(elt['uri']))
     end
     return output.join
   end
@@ -275,7 +279,7 @@ class CvlcServer
 
   def do_add(pathname)
     fail CvlcServerError, "No such file or directory '#{pathname}'" unless File.exist? "#{@music_root}/#{pathname}"
-    string = URI.encode(pathname.sub(%r{/+$}, '')).gsub('&', '%26')
+    string = url_encode(pathname.sub(%r{/+$}, ''))
     do_command("requests/status.json?command=in_play&input=file://#{@music_root}/#{string}&option=novideo")
     return currently_playing
   end
@@ -336,7 +340,7 @@ class CvlcServer
 
   def do_seek(amount)
     if amount =~ %r{^[+-]?\d+\%?$}
-      do_command("requests/status.json?command=seek&val=#{URI.encode(amount)}")
+      do_command("requests/status.json?command=seek&val=#{url_encode(amount)}")
     else
       fail CvlcServerError, "Ill-formed seek amount '#{amount}'"
     end
@@ -355,7 +359,7 @@ class CvlcServer
   end
 
   def do_enqueue(pathname)
-    string = URI.encode(pathname.sub(%r{/+$}, ''))
+    string = url_encode(pathname.sub(%r{/+$}, ''))
     do_command("requests/status.json?command=in_enqueue&input=#{@music_root}/#{string}")
     return currently_playing
   end
@@ -391,9 +395,8 @@ class CvlcServer
   # 100 == 0 for some reason...
 
   def do_volume(num)
-    if num.to_i > 300 || num.to_i < 1
-      fail CvlcServerError, "The 'volume' command requires an integer value between 1 and 300..."
-    end
+
+    fail CvlcServerError, "The 'volume' command requires an integer value between 0 and 300..."  unless num.between?(0, 300)
     do_command("requests/status.json?command=volume&val=#{num}")
     sleep STATUS_PAUSE
     return pretty_status(current_status)

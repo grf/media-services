@@ -22,30 +22,26 @@ class CommandExecutor
     return unless command # special case
 
     completions = @commands.completions(command)
+    count = completions.count
+    fail CommandExecutorError, "This program doesn't know how to '#{command}'." if count == 0
+    fail CommandExecutorError, "The '#{input}' command is ambiguous (could be '#{completions.join("', '")}')." if count > 1
 
-    case completions.count
-    when 0
-      fail CommandExecutorError, "This program doesn't know how to '#{command}'."
+    name    = completions[0]
+    record  = @commands[name]
+    thunk   = record.command
+    argtype = record.argument
 
-    when 1
-      name   = completions[0]
-      record = @commands[name]
+    error_text = argument_errors(name, argument, argtype)
 
-      thunk    = record.command
-      argtype  = record.argument
+    fail CommandExecutorError, error_text if error_text
 
-      error_text = argument_errors(name, argument, argtype)
+    return case
+           when argtype == Fixnum then thunk.call(argument.to_i)
+           when argtype == String then thunk.call(argument.to_s)
+           when argtype.nil?      then thunk.call
+           end
 
-      fail CommandExecutorError, error_text if error_text
-
-      return thunk.call                if argtype.nil?
-      return thunk.call(argument.to_i) if argtype == Fixnum
-      return thunk.call(argument.to_s) if argtype == String
-
-      fail CommandExecutorError, "Don't know what to do... for arguments of class '#{argtype}'"
-    else
-      fail CommandExecutorError, "The '#{input}' command is ambiguous (could be '#{completions.join("', '")}')."
-    end
+    fail CommandExecutorError, "Don't know what to do... for arguments of class '#{argtype}'"
   end
 
   private
