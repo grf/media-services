@@ -17,16 +17,15 @@ class CvlcServer
     @music_root = music_root.gsub(%r{/+$}, '')
     fail "#{@music_root} is not a valid directory" unless File.exist?(@music_root) && File.directory?(@music_root)
     fail "#{@music_root} is not readable"          unless File.readable?(@music_root)
-    setup(server_url)  # sets up @server_handle, @user, @password
+    setup(server_url)  # sets @server_handle, @user, @password for RestClient connections
   end
 
   private
 
   def setup(server_url)
     uri = URI.parse server_url
-    server_handle = uri.scheme + '://' + uri.host + (uri.port == 80 ? '' : ":#{uri.port}")
 
-    @server_handle = server_handle
+    @server_handle = uri.scheme + '://' + uri.host + (uri.port == 80 ? '' : ":#{uri.port}")
     @user          = uri.user
     @password      = uri.password
 
@@ -50,16 +49,16 @@ class CvlcServer
 
   # pretty_status(status) - status is a json-derived hash, print it out somewhat pretty
 
-  def pretty_status(current_status)
+  def pretty_status(status)
     strings = []
-    current_status.keys.sort.each { |k| strings.push format("%15s: %s\n", k, current_status[k].inspect) }
+    status.keys.sort.each { |k| strings.push format("%15s: %s\n", k, status[k].inspect) }
     return strings.join
   end
 
   public
 
   def ping
-    status
+    current_status
     return true
   rescue
     return false
@@ -67,7 +66,7 @@ class CvlcServer
 
   private
 
-  # status - returns data about the current cvlc status - can be as complex as:
+  # current_status - returns data about the current cvlc status - can be as complex as:
   #
   # {
   #   "loop": false,
@@ -153,7 +152,7 @@ class CvlcServer
   #   "fullscreen": 0
   # }
 
-  def status
+  def current_status
     return JSON.parse(do_command('requests/status.json'))
   end
 
@@ -213,9 +212,9 @@ class CvlcServer
   #
 
 
-  def playlist
-    current_playlist = JSON.parse(do_command('requests/playlist.json'))
-    inner    = current_playlist['children'].first
+  def current_playlist
+    playlist = JSON.parse(do_command('requests/playlist.json'))
+    inner    = playlist['children'].first
     output   = []
 
     if inner['name'] =~ /playlist/i && inner['children'].class == Array
@@ -230,12 +229,12 @@ class CvlcServer
     return output
   end
 
-  # id_now_playing(current_status) examines the current_status data structure returned
+  # id_now_playing(status) examines the status data structure returned
   # by the cvlc service, and returns the id of the song in the playlist
   # currently playing. If nothing is playing, it returns nil.
 
-  def id_now_playing(current_status)
-    return (current_status['state'] == 'playing' ? current_status['currentplid'].to_i.to_s : nil)
+  def id_now_playing(status)
+    return (status['state'] == 'playing' ? status['currentplid'].to_i.to_s : nil)
   end
 
   # currently_playing returns a pretty string indicating the song
@@ -243,8 +242,8 @@ class CvlcServer
 
   def currently_playing
     sleep STATUS_PAUSE
-    id_playing = id_now_playing(status)
-    playlist.each do |elt|
+    id_playing = id_now_playing(current_status)
+    current_playlist.each do |elt|
       if elt['id'].to_s == id_playing
         return format('*   %03d -  %s', elt['id'], cleanup_pathname(URI.decode(elt['uri'])))
       end
@@ -261,9 +260,9 @@ class CvlcServer
   # asterisk. Empty return text is possible.
 
   def do_list
-    now_playing =  id_now_playing(status)
+    now_playing =  id_now_playing(current_status)
     output = []
-    playlist.each do |elt|
+    current_playlist.each do |elt|
       marker = (elt['id'].to_s == now_playing ? '*' : ' ')
       output.push format("%s   %03d -  %s\n", marker, elt['id'], cleanup_pathname(URI.decode(elt['uri'])))
     end
@@ -284,7 +283,7 @@ class CvlcServer
   # do_status - returns a compact list of the returned json.
 
   def do_status
-    return pretty_status(status)
+    return pretty_status(current_status)
   end
 
   # do_next - do next entry on playlist, wraps around
@@ -397,7 +396,7 @@ class CvlcServer
     end
     do_command("requests/status.json?command=volume&val=#{num}")
     sleep STATUS_PAUSE
-    return pretty_status(status)
+    return pretty_status(current_status)
   end
 
 end  # class CvlcServer
