@@ -28,27 +28,27 @@ def setup_commands(server, music_root)
   # cvlc.do_help(commands) may be problematic... do_help should be moved up here, sorta... delegate across all kinds of commands (like vsx.methods when we do that?
 
   [
-    [ 'delete',   ->(id)  { cvlc.do_delete_id(id) },  Fixnum,  'remove item <num> from the playlist' ],
-    [ 'play',     ->(id)  { cvlc.do_play_id(id) },    Fixnum,  'play item <num> from the playlist' ],
-    [ 'volume',   ->(lvl) { cvlc.do_volume(lvl) },    Fixnum,  'set volume to <num>,  0..300' ],
+    [ 'delete',   ->(id)  { cvlc.do_delete_id(id) }, Fixnum,  'remove item <num> from the playlist' ],
+    [ 'play',     ->(id)  { cvlc.do_play_id(id) },   Fixnum,  'play item <num> from the playlist' ],
+    [ 'volume',   ->(lvl) { cvlc.do_volume(lvl) },   Fixnum,  'set volume to <num>,  0..300' ],
 
     [ 'add',      ->(dir) { cvlc.do_add(dir) },      String,  'add directory or filename <string> to the playlist, begin playing there' ],
     [ 'enqueue',  ->(dir) { cvlc.do_enqueue(dir) },  String,  'add directory or filename <string> to the end of the playlist, continue with current song' ],
     [ 'seek',     ->(amt) { cvlc.do_seek(amt) },     String,  'seek +/- seconds or percent - e.g. -10 or +25% ' ],
 
 
-    [ '?',        -> { cvlc.do_help(commands) },  nil,     'this help' ],
-    [ 'clear',    -> { cvlc.do_clear_playlist },  nil,     'clear the playlist' ],
-    [ 'list',     -> { cvlc.do_list },            nil,     'print the current playlist' ],
-    [ 'loop',     -> { cvlc.do_toggle_loop },     nil,     'toggle looping' ],
-    [ 'next',     -> { cvlc.do_next },            nil,     'play next entry on the playlist' ],
-    [ 'pause',    -> { cvlc.do_force_pause },     nil,     'pause playing' ],
-    [ 'previous', -> { cvlc.do_previous },        nil,     'play the previous entry' ],
-    [ 'random',   -> { cvlc.do_toggle_random },   nil,     'toggle random play' ],
-    [ 'repeat',   -> { cvlc.do_toggle_repeat },   nil,     'toggle repeat' ],
-    [ 'resume',   -> { cvlc.do_force_resume },    nil,     'resume playing' ],
-    [ 'status',   -> { cvlc.do_status },          nil,     'pretty print status of cvlc server' ],
-    [ 'stop',     -> { cvlc.do_stop },            nil,     'stop playing' ],
+    [ '?',        -> { cvlc.do_help(commands) },  nil,  'this help' ],
+    [ 'clear',    -> { cvlc.do_clear_playlist },  nil,  'clear the playlist' ],
+    [ 'list',     -> { cvlc.do_list },            nil,  'print the current playlist' ],
+    [ 'loop',     -> { cvlc.do_toggle_loop },     nil,  'toggle looping' ],
+    [ 'next',     -> { cvlc.do_next },            nil,  'play next entry on the playlist' ],
+    [ 'pause',    -> { cvlc.do_force_pause },     nil,  'pause playing' ],
+    [ 'previous', -> { cvlc.do_previous },        nil,  'play the previous entry' ],
+    [ 'random',   -> { cvlc.do_toggle_random },   nil,  'toggle random play' ],
+    [ 'repeat',   -> { cvlc.do_toggle_repeat },   nil,  'toggle repeat' ],
+    [ 'resume',   -> { cvlc.do_force_resume },    nil,  'resume playing' ],
+    [ 'status',   -> { cvlc.do_status },          nil,  'pretty print status of cvlc server' ],
+    [ 'stop',     -> { cvlc.do_stop },            nil,  'stop playing' ],
 
   ].each { |cmd|  commands.add(*cmd) }
 
@@ -65,6 +65,6 @@ end
 # main
 
 cmds = setup_commands('http://:foo@satyagraha.sacred.net:9090/', '/data/Music/')
-repl = MuseRepl.new(cmds, 'muse> ')
+muse = MuseRepl.new(cmds, 'muse> ')
 
-repl.loop
+muse.repl
