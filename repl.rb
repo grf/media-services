@@ -20,7 +20,12 @@ class Repl
     @commands = command_exectutor
     @prompt   = prompt
     @goodbye  = goodbye_message
-    fail ReplError, 'The first argument must be a CommandExecutor object' unless @commands.is_a? CommandExecutor
+    # fail ReplError, 'The first argument must be a CommandExecutor object' unless @commands.is_a? CommandExecutor
+    #
+    # Whatever, duck.  The only requirement for command_exectutor is that it have two methods:
+    #
+    # 'execute(str) -> str | nil'  - should throw exceptions with a succinct message
+    # 'usage -> str' - page full or so of instructions of commands available
   end
 
   # Top level REPL (Read-Eval-Print Loop).
