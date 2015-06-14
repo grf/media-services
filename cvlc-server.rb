@@ -12,13 +12,14 @@ class CvlcServer
 
   include ERB::Util
 
-  QUICKLY_TIMEOUT = 1.75                    # How long to wait for a response from the CVLC server
-  STATUS_PAUSE    = 0.25                    # Some commands need a little time to set up, or to complete.  This value should be less than 1 sec, ideally less than 300 msec.
+  QUICKLY_TIMEOUT = 1.75   # How long to wait for a response from the CVLC server
+  STATUS_PAUSE    = 0.25   # Some commands need a little time to set up, or to complete.  This value should be less than 1 sec, ideally less than 300 msec.
 
-  # e.g. 'http://user:password@satyagraha.sacred.net:9090/'
+  # e.g. server_url => 'http://user:password@satyagraha.sacred.net:9090/',  music_root => '/data/Music' or some such
 
   def initialize(server_url, music_root)
     @music_root = music_root.gsub(%r{/+$}, '')
+    # TODO: these really refer to the root on the server, clients shouldn't care: do a listing directory for sanity check?
     fail "#{@music_root} is not a valid directory" unless File.exist?(@music_root) && File.directory?(@music_root)
     fail "#{@music_root} is not readable"          unless File.readable?(@music_root)
     setup(server_url)  # sets @server_handle, @user, @password for RestClient connections

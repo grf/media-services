@@ -25,29 +25,29 @@ def setup_commands(server, music_root)
 
   commands = CommandExecutor.new
 
-  # cvlc.do_help(commands) may be problematic...
+  # cvlc.do_help(commands) where commands should be what's returned by CommandExecutor.new...
 
   [
-    [ 'delete',   ->(id)  { cvlc.do_delete_id(id) }, Fixnum,  'remove item <num> from the playlist' ],
-    [ 'play',     ->(id)  { cvlc.do_play_id(id) },   Fixnum,  'play item <num> from the playlist' ],
-    [ 'volume',   ->(lvl) { cvlc.do_volume(lvl) },   Fixnum,  'set volume to <num>,  0..300' ],
+    [ 'delete',   ->(id)  { cvlc.do_delete_id(id) }, Fixnum,  'Remove item <num> from the playlist' ],
+    [ 'play',     ->(id)  { cvlc.do_play_id(id) },   Fixnum,  'Play item <num> from the playlist' ],
+    [ 'volume',   ->(lvl) { cvlc.do_volume(lvl) },   Fixnum,  'Set volume to <num>,  0..300' ],
 
-    [ 'add',      ->(dir) { cvlc.do_add(dir) },      String,  'add directory or filename <string> to the playlist, begin playing there' ],
-    [ 'enqueue',  ->(dir) { cvlc.do_enqueue(dir) },  String,  'add directory or filename <string> to the end of the playlist, continue with current song' ],
-    [ 'seek',     ->(amt) { cvlc.do_seek(amt) },     String,  'seek +/- seconds or percent - e.g. -10 or +25% ' ],
+    [ 'add',      ->(dir) { cvlc.do_add(dir) },      String,  'Add directory or filename <string> to the playlist, begin playing there' ],
+    [ 'enqueue',  ->(dir) { cvlc.do_enqueue(dir) },  String,  'Add directory or filename <string> to the end of the playlist, continue with current song' ],
+    [ 'seek',     ->(amt) { cvlc.do_seek(amt) },     String,  'Seek +/- seconds or percent - e.g. -10 or +25% ' ],
 
-    [ '?',        -> { cvlc.do_help(commands) },  nil,  'this help' ],
-    [ 'clear',    -> { cvlc.do_clear_playlist },  nil,  'clear the playlist' ],
-    [ 'list',     -> { cvlc.do_list },            nil,  'print the current playlist' ],
-    [ 'loop',     -> { cvlc.do_toggle_loop },     nil,  'toggle looping' ],
-    [ 'next',     -> { cvlc.do_next },            nil,  'play next entry on the playlist' ],
-    [ 'pause',    -> { cvlc.do_force_pause },     nil,  'pause playing' ],
-    [ 'previous', -> { cvlc.do_previous },        nil,  'play the previous entry' ],
-    [ 'random',   -> { cvlc.do_toggle_random },   nil,  'toggle random play' ],
-    [ 'repeat',   -> { cvlc.do_toggle_repeat },   nil,  'toggle repeat' ],
-    [ 'resume',   -> { cvlc.do_force_resume },    nil,  'resume playing' ],
-    [ 'status',   -> { cvlc.do_status },          nil,  'pretty print status of cvlc server' ],
-    [ 'stop',     -> { cvlc.do_stop },            nil,  'stop playing' ],
+    [ '?',        -> { cvlc.do_help(commands) },  nil,  'This help' ],
+    [ 'clear',    -> { cvlc.do_clear_playlist },  nil,  'Clear the playlist' ],
+    [ 'list',     -> { cvlc.do_list },            nil,  'Print the current playlist' ],
+    [ 'loop',     -> { cvlc.do_toggle_loop },     nil,  'Toggle looping' ],
+    [ 'next',     -> { cvlc.do_next },            nil,  'Play next entry on the playlist' ],
+    [ 'pause',    -> { cvlc.do_force_pause },     nil,  'Pause playing' ],
+    [ 'previous', -> { cvlc.do_previous },        nil,  'Play the previous entry' ],
+    [ 'random',   -> { cvlc.do_toggle_random },   nil,  'Toggle random play' ],
+    [ 'repeat',   -> { cvlc.do_toggle_repeat },   nil,  'Toggle repeat' ],
+    [ 'resume',   -> { cvlc.do_force_resume },    nil,  'Resume playing' ],
+    [ 'status',   -> { cvlc.do_status },          nil,  'Pretty print status of cvlc server' ],
+    [ 'stop',     -> { cvlc.do_stop },            nil,  'Stop playing' ],
 
   ].each { |cmd|  commands.add(*cmd) }
 
