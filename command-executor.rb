@@ -44,6 +44,10 @@ class CommandExecutor
     fail CommandExecutorError, "Don't know what to do... for arguments of class '#{argtype}'"
   end
 
+  def [](value)
+    return @commands[value]
+  end
+
   private
 
   def argument_errors(name, argval, argtype)
