@@ -1,4 +1,4 @@
-# -*- ruby-mode -*-
+# -*- mode: ruby -*-
 
 require 'rest-client'
 require 'timeout'
@@ -6,9 +6,12 @@ require 'uri'
 require 'cgi'
 require 'erb'
 
-class CvlcServerError < StandardError; end
 
-class CvlcServer
+#
+
+class CvlcClientError < StandardError; end
+
+class CvlcClient
 
   include ERB::Util
 
@@ -17,12 +20,14 @@ class CvlcServer
 
   # e.g. server_url => 'http://user:password@satyagraha.sacred.net:9090/',  music_root => '/data/Music' or some such
 
+  attr_reader :server, :music_root
+
   def initialize(server_url, music_root)
     @music_root = music_root.gsub(%r{/+$}, '')
     # TODO: these really refer to the root on the server, clients shouldn't care: do a listing directory for sanity check?
     fail "#{@music_root} is not a valid directory" unless File.exist?(@music_root) && File.directory?(@music_root)
     fail "#{@music_root} is not readable"          unless File.readable?(@music_root)
-    setup(server_url)  # sets @server_handle, @user, @password for RestClient connections
+    setup(server_url)  # sets @server, @user, @password for RestClient connections
   end
 
   private
@@ -30,12 +35,12 @@ class CvlcServer
   def setup(server_url)
     uri = URI.parse server_url
 
-    @server_handle = uri.scheme + '://' + uri.host + (uri.port == 80 ? '' : ":#{uri.port}")
-    @user          = uri.user
-    @password      = uri.password
+    @server    = uri.scheme + '://' + uri.host + (uri.port == 80 ? '' : ":#{uri.port}")
+    @user      = uri.user
+    @password  = uri.password
 
   rescue => e
-    raise "Can't parse server URL '#{server_url}': #{e.class} #{e.message}'"   # we don't use CvlcServerError in this case because we want to fail hard. TODO: wtf?
+    raise "Can't parse server URL '#{server_url}': #{e.class} #{e.message}'"   # we don't use CvlcClientError in this case because we want to fail hard. TODO: wtf?
   end
 
   def quickly(time = QUICKLY_TIMEOUT)
@@ -43,7 +48,7 @@ class CvlcServer
       yield
     end
   rescue Timeout::Error
-    raise CvlcServerError, "Timed out after #{time} seconds"
+    raise CvlcClientError, "Timed out after #{time} seconds"
   end
 
   # remove unuseful junk from a file/directory name
@@ -163,18 +168,18 @@ class CvlcServer
   end
 
   def do_command(command)
-    command  = [ @server_handle, '/', command ].join
+    command  = [ @server, '/', command ].join
     resource =  RestClient::Resource.new(command, @user, @password)
 
     response = quickly do
       res = resource.get
-      fail CvlcServerError, "Bad response code #{response.code} for command '#{command}'" unless res.code < 300
+      fail CvlcClientError, "Bad response code #{response.code} for command '#{command}'" unless res.code < 300
       res
     end
 
     return response
   rescue => e
-    raise CvlcServerError, "do_command: #{e}\n" + 'do_command: Error tyrying to communicate wth the cvlc media service (is it running?).'
+    raise CvlcClientError, "do_command: #{e}\n" + 'do_command: Error tyrying to communicate wth the cvlc media service (is it running?).'
   end
 
   # playlist  interrogates the cvlc web service and returns a list of music on the
@@ -230,7 +235,7 @@ class CvlcServer
         output.push elt
       end
     else
-      fail CvlcServerError, "Unexpected playlist output: \n" + JSON.pretty_generate(playlist)
+      fail CvlcClientError, "Unexpected playlist output: \n" + JSON.pretty_generate(playlist)
     end
     return output
   end
@@ -280,7 +285,7 @@ class CvlcServer
   # do so at some point when we make this a class)
 
   def do_add(pathname)
-    fail CvlcServerError, "No such file or directory '#{pathname}'" unless File.exist? "#{@music_root}/#{pathname}"
+    fail CvlcClientError, "No such file or directory '#{pathname}'" unless File.exist? "#{@music_root}/#{pathname}"
     string = url_encode(pathname.sub(%r{/+$}, ''))
     do_command("requests/status.json?command=in_play&input=file://#{@music_root}/#{string}&option=novideo")
     return currently_playing
@@ -344,7 +349,7 @@ class CvlcServer
     if amount =~ %r{^[+-]?\d+\%?$}
       do_command("requests/status.json?command=seek&val=#{url_encode(amount)}")
     else
-      fail CvlcServerError, "Ill-formed seek amount '#{amount}'"
+      fail CvlcClientError, "Ill-formed seek amount '#{amount}'"
     end
     return
   end
@@ -398,10 +403,10 @@ class CvlcServer
 
   def do_volume(num)
 
-    fail CvlcServerError, "The 'volume' command requires an integer value between 0 and 300..."  unless num.between?(0, 300)
+    fail CvlcClientError, "The 'volume' command requires an integer value between 0 and 300..."  unless num.between?(0, 300)
     do_command("requests/status.json?command=volume&val=#{num}")
     sleep STATUS_PAUSE
     return pretty_status(current_status)
   end
 
-end  # class CvlcServer
+end  # class CvlcClient

@@ -13,19 +13,13 @@ $LOAD_PATH.unshift File.dirname(__FILE__)
 
 require 'command-executor'
 require 'repl'
-require 'cvlc-server'
+require 'cvlc-client'
 
 class MuseError < StandardError; end
 
-def setup_commands(server, music_root)
+def add_commands(cmdr, cvlc)
 
-  cvlc = CvlcServer.new(server, music_root)
-
-  fail MuseError, "Can't connect to music server" unless cvlc.ping
-
-  commands = CommandExecutor.new
-
-  # cvlc.do_help(commands) where commands should be what's returned by CommandExecutor.new...
+  # Note subtle bit in cvlc.do_help(cmdr) where 'cmdr' is something like CommandExecutor.new...
 
   [
     [ 'delete',   ->(id)  { cvlc.do_delete_id(id) }, Fixnum,  'Remove item <num> from the playlist' ],
@@ -36,7 +30,7 @@ def setup_commands(server, music_root)
     [ 'enqueue',  ->(dir) { cvlc.do_enqueue(dir) },  String,  'Add directory or filename <string> to the end of the playlist, continue with current song' ],
     [ 'seek',     ->(amt) { cvlc.do_seek(amt) },     String,  'Seek +/- seconds or percent - e.g. -10 or +25% ' ],
 
-    [ '?',        -> { cvlc.do_help(commands) },  nil,  'This help' ],
+    [ '?',        -> { cvlc.do_help(cmdr) },      nil,  'This help' ],
     [ 'clear',    -> { cvlc.do_clear_playlist },  nil,  'Clear the playlist' ],
     [ 'list',     -> { cvlc.do_list },            nil,  'Print the current playlist' ],
     [ 'loop',     -> { cvlc.do_toggle_loop },     nil,  'Toggle looping' ],
@@ -49,9 +43,8 @@ def setup_commands(server, music_root)
     [ 'status',   -> { cvlc.do_status },          nil,  'Pretty print status of cvlc server' ],
     [ 'stop',     -> { cvlc.do_stop },            nil,  'Stop playing' ],
 
-  ].each { |cmd|  commands.add(*cmd) }
+  ].each { |cmd|  cmdr.add(*cmd) }
 
-  return commands
 end
 
 class MuseRepl < Repl
@@ -61,9 +54,21 @@ class MuseRepl < Repl
   end
 end
 
-# main()
 
-cmdr = setup_commands('http://:foo@satyagraha.sacred.net:9090/', '/data/Music/')
-muse = MuseRepl.new(cmdr, 'muse> ')
-muse.debug = false
-muse.repl
+def main
+  cvlc = CvlcClient.new('http://:foo@satyagraha.sacred.net:9090/', '/Volumes/data/Music/')
+  fail MuseError, "Can't connect to music server #{cvlc.server}" unless cvlc.ping
+  cmdr = CommandExecutor.new
+  add_commands(cmdr, cvlc)
+  muse = MuseRepl.new(cmdr, 'muse> ')
+  muse.debug = false
+  muse.repl
+rescue MuseError, CvlcClientError, CommandExecutorError, ReplError => e
+  STDERR.puts "#{e.class}: #{e.message}"
+rescue => e
+  STDERR.puts e, e.backtrace
+end
+
+
+
+main()
